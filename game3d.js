@@ -1,10 +1,11 @@
 const CDN_BASE_URL = 'https://pub-2d994ab822d5426bad338ecb218683d8.r2.dev';
 
 class MundoKnifeGame3D {
-    constructor(mode = 'practice', isMultiplayer = false, isHostPlayer = false) {
+    constructor(mode = 'practice', isMultiplayer = false, isHostPlayer = false, practiceMode = '1v1') {
         this.gameMode = mode;
         this.isMultiplayer = isMultiplayer;
         this.isHost = isHostPlayer;
+        this.practiceMode = practiceMode;
         this.lastTime = performance.now();
         this.accumulator = 0.0;
         this.fixedDt = this.getPlatformAdjustedTimestep();
@@ -270,31 +271,44 @@ class MundoKnifeGame3D {
     }
 
 
-    generateRandomSpawnPositions() {
-        const riverZone = { xMin: -10, xMax: 10 };
+    generateTeamSpawnPositions(mode) {
+        const positions = { team1: [], team2: [] };
         
-        const zBounds = { zMin: -32, zMax: 32 };
+        if (mode === '1v1') {
+            const zBounds = { zMin: -32, zMax: 32 };
+            const player1Bounds = { xMin: -42, xMax: -25 };
+            const player2Bounds = { xMin: 25, xMax: 42 };
+            
+            positions.team1.push({
+                x: Math.random() * (player1Bounds.xMax - player1Bounds.xMin) + player1Bounds.xMin,
+                z: Math.random() * (zBounds.zMax - zBounds.zMin) + zBounds.zMin,
+                facing: 1
+            });
+            
+            positions.team2.push({
+                x: Math.random() * (player2Bounds.xMax - player2Bounds.xMin) + player2Bounds.xMin,
+                z: Math.random() * (zBounds.zMax - zBounds.zMin) + zBounds.zMin,
+                facing: -1
+            });
+        } else if (mode === '3v3') {
+            const team1BaseX = -35;
+            const team2BaseX = 35;
+            const spacing = 15;
+            
+            positions.team1.push(
+                { x: team1BaseX, z: 0, facing: 1 },
+                { x: team1BaseX - 8, z: -spacing, facing: 1 },
+                { x: team1BaseX - 8, z: spacing, facing: 1 }
+            );
+            
+            positions.team2.push(
+                { x: team2BaseX, z: 0, facing: -1 },
+                { x: team2BaseX + 8, z: -spacing, facing: -1 },
+                { x: team2BaseX + 8, z: spacing, facing: -1 }
+            );
+        }
         
-        const player1Bounds = { xMin: -42, xMax: -25 };
-        const player2Bounds = { xMin: 25, xMax: 42 };
-        
-        const player1Pos = {
-            x: Math.random() * (player1Bounds.xMax - player1Bounds.xMin) + player1Bounds.xMin,
-            z: Math.random() * (zBounds.zMax - zBounds.zMin) + zBounds.zMin
-        };
-        
-        const player2Pos = {
-            x: Math.random() * (player2Bounds.xMax - player2Bounds.xMin) + player2Bounds.xMin,
-            z: Math.random() * (zBounds.zMax - zBounds.zMin) + zBounds.zMin
-        };
-        
-        const player1Facing = 1;
-        const player2Facing = -1;
-        
-        return {
-            player1: { x: player1Pos.x, z: player1Pos.z, facing: player1Facing },
-            player2: { x: player2Pos.x, z: player2Pos.z, facing: player2Facing }
-        };
+        return positions;
     }
 
     isWithinMapBounds(x, z, player) {
@@ -303,12 +317,12 @@ class MundoKnifeGame3D {
             return false;
         }
         
-        if (player === this.player1 && x > -18) {
-            console.log('🚫 [BOUNDS] Player1 blocked from crossing to right side');
+        if (player.team === 1 && x > -18) {
+            console.log('🚫 [BOUNDS] Team1 blocked from crossing to right side');
             return false;
         }
-        if (player === this.player2 && x < 18) {
-            console.log('🚫 [BOUNDS] Player2 blocked from crossing to left side');
+        if (player.team === 2 && x < 18) {
+            console.log('🚫 [BOUNDS] Team2 blocked from crossing to left side');
             return false;
         }
         
@@ -341,69 +355,97 @@ class MundoKnifeGame3D {
         };
 
         this.particles = [];
-
         this.characterSize = 10.5;
         this.knifeSpawnHeight = null;
         this.actualModelHeight = null;
         
-        const spawnPositions = this.generateRandomSpawnPositions();
+        const spawnPositions = this.generateTeamSpawnPositions(this.practiceMode);
         
-        this.player1 = {
-            x: spawnPositions.player1.x,
-            y: 0,
-            z: spawnPositions.player1.z,
-            health: 5,
-            maxHealth: 5,
-            color: 0x9370DB,
-            facing: spawnPositions.player1.facing,
-            rotation: 0,
-            isMoving: false,
-            targetX: null,
-            targetZ: null,
-            moveSpeed: 0.39,
-            lastKnifeTime: 0,
-            knifeCooldown: 2200,
-            mesh: null,
-            canAttack: false,
-            isThrowingKnife: false,
-            mixer: null,
-            animations: {},
-            currentAnimation: null,
-            animationState: 'idle'
-        };
+        this.team1 = [];
+        this.team2 = [];
+        
+        spawnPositions.team1.forEach((pos, index) => {
+            const player = {
+                x: pos.x,
+                y: 0,
+                z: pos.z,
+                health: 5,
+                maxHealth: 5,
+                color: index === 0 ? 0x9370DB : 0x6A5ACD,
+                facing: pos.facing,
+                rotation: 0,
+                isMoving: false,
+                targetX: null,
+                targetZ: null,
+                moveSpeed: 0.39,
+                lastKnifeTime: 0,
+                knifeCooldown: 2200,
+                mesh: null,
+                canAttack: index === 0,
+                isThrowingKnife: false,
+                mixer: null,
+                animations: {},
+                currentAnimation: null,
+                animationState: 'idle',
+                isHuman: index === 0,
+                isAI: index !== 0,
+                team: 1,
+                playerIndex: index
+            };
+            
+            if (index !== 0) {
+                player.aiStartDelay = 0;
+                player.aiCanAttack = false;
+                player.throwCount = 0;
+                player.missPattern = this.generateMissPattern();
+            }
+            
+            this.team1.push(player);
+        });
+        
+        spawnPositions.team2.forEach((pos, index) => {
+            const player = {
+                x: pos.x,
+                y: 0,
+                z: pos.z,
+                health: 5,
+                maxHealth: 5,
+                color: 0xFF6347,
+                facing: pos.facing,
+                rotation: 0,
+                isMoving: false,
+                targetX: null,
+                targetZ: null,
+                moveSpeed: 0.39,
+                lastKnifeTime: 0,
+                knifeCooldown: 2200,
+                mesh: null,
+                aiStartDelay: 0,
+                aiCanAttack: false,
+                isThrowingKnife: false,
+                mixer: null,
+                animations: {},
+                currentAnimation: null,
+                animationState: 'idle',
+                throwCount: 0,
+                missPattern: this.generateMissPattern(),
+                isHuman: false,
+                isAI: true,
+                team: 2,
+                playerIndex: index
+            };
+            
+            this.team2.push(player);
+        });
 
-        this.player2 = {
-            x: spawnPositions.player2.x,
-            y: 0,
-            z: spawnPositions.player2.z,
-            health: 5,
-            maxHealth: 5,
-            color: 0x9370DB,
-            facing: spawnPositions.player2.facing,
-            rotation: 0,
-            isMoving: false,
-            targetX: null,
-            targetZ: null,
-            moveSpeed: 0.39,
-            lastKnifeTime: 0,
-            knifeCooldown: 2200,
-            mesh: null,
-            aiStartDelay: 0,
-            aiCanAttack: false,
-            isThrowingKnife: false,
-            mixer: null,
-            animations: {},
-            currentAnimation: null,
-            animationState: 'idle',
-            throwCount: 0,
-            missPattern: this.generateMissPattern()
-        };
+        this.player1 = this.team1[0];
+        this.player2 = this.team2[0];
 
         this.knives = [];
         
         this.killCounts = {
-            player1: 0,
-            player2: 0
+            team1: 0,
+            team2: 0
         };
 
         this.keys = {};
@@ -421,10 +463,11 @@ class MundoKnifeGame3D {
         this.mouseWorldX = 0;
         this.mouseWorldZ = 0;
 
-        this.createPlayer3D(this.player1);
-        this.createPlayer3D(this.player2);
+        this.team1.forEach(player => this.createPlayer3D(player));
+        this.team2.forEach(player => this.createPlayer3D(player));
         
         this.setupCamera();
+        this.createHealthBarElements();
         this.updateHealthDisplay();
         this.startCountdown();
         this.startLatencyMeasurement();
@@ -526,6 +569,31 @@ class MundoKnifeGame3D {
 
     createHealthDisplay(player) {
         return null;
+    }
+
+    createHealthBarElements() {
+        document.querySelectorAll('.health-bar-3d-dynamic').forEach(el => el.remove());
+        
+        const gameContainer = document.getElementById('gameContainer');
+        
+        [...this.team1, ...this.team2].forEach((player, globalIndex) => {
+            const healthBarId = `healthBar3D_team${player.team}_${player.playerIndex}`;
+            
+            const healthBar = document.createElement('div');
+            healthBar.id = healthBarId;
+            healthBar.className = 'health-bar-3d health-bar-3d-dynamic';
+            healthBar.style.display = 'none';
+            
+            for (let i = 0; i < 5; i++) {
+                const segment = document.createElement('div');
+                segment.className = 'health-segment';
+                healthBar.appendChild(segment);
+            }
+            
+            gameContainer.appendChild(healthBar);
+            
+            player.healthBarElement = healthBar;
+        });
     }
 
     lightenColor(color, amount) {
@@ -914,6 +982,7 @@ class MundoKnifeGame3D {
             vx: directionXZ.x * knifeSpeed,
             vz: directionXZ.z * knifeSpeed,
             fromPlayer: fromPlayer === this.player1 ? 1 : 2,
+            thrower: fromPlayer,
             audio: audio
         };
         
@@ -983,7 +1052,8 @@ class MundoKnifeGame3D {
             mesh: knifeGroup,
             vx: direction.x * 4.5864,
             vz: direction.z * 4.5864,
-            fromPlayer: fromPlayer === this.player1 ? 1 : 2
+            fromPlayer: fromPlayer === this.player1 ? 1 : 2,
+            thrower: fromPlayer
         };
         
         this.knives.push(knifeData);
@@ -991,18 +1061,36 @@ class MundoKnifeGame3D {
     }
 
     updatePlayers(dt) {
-        this.updatePlayerMovement(this.player1, dt);
-        this.updatePlayerMovement(this.player2, dt);
+        [...this.team1, ...this.team2].forEach(player => {
+            this.updatePlayerMovement(player, dt);
+        });
         
-        if (!this.isMultiplayer && this.player2.health > 0 && this.gameState.isRunning && !this.player2.isThrowingKnife && Math.random() < 0.06) {
-            const potentialX = this.player2.x + (Math.random() - 0.5) * 30;
-            const potentialZ = this.player2.z + (Math.random() - 0.5) * 30;
-            
-            if (this.isWithinMapBounds(potentialX, potentialZ, this.player2)) {
-                this.player2.targetX = potentialX;
-                this.player2.targetZ = potentialZ;
-                this.player2.isMoving = true;
-            }
+        if (!this.isMultiplayer && this.gameState.isRunning) {
+            [...this.team1, ...this.team2].forEach(player => {
+                if (!player.isAI || player.health <= 0 || player.isThrowingKnife) return;
+                
+                if (Math.random() < 0.06) {
+                    const potentialX = player.x + (Math.random() - 0.5) * 30;
+                    const potentialZ = player.z + (Math.random() - 0.5) * 30;
+                    
+                    if (this.isWithinMapBounds(potentialX, potentialZ, player)) {
+                        player.targetX = potentialX;
+                        player.targetZ = potentialZ;
+                        player.isMoving = true;
+                    }
+                }
+                
+                if (Math.random() < 0.015 && Date.now() - player.lastKnifeTime > player.knifeCooldown) {
+                    const enemyTeam = player.team === 1 ? this.team2 : this.team1;
+                    const aliveEnemies = enemyTeam.filter(e => e.health > 0);
+                    
+                    if (aliveEnemies.length > 0) {
+                        const randomEnemy = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
+                        this.createKnife3DTowards(player, randomEnemy.x, randomEnemy.z, randomEnemy);
+                        player.lastKnifeTime = Date.now();
+                    }
+                }
+            });
         }
     }
 
@@ -1103,9 +1191,10 @@ class MundoKnifeGame3D {
     checkKnifeCollisions(knife, knifeIndex) {
         const knifePos = knife.mesh.position;
         
-        const targets = knife.fromPlayer === 1 ? [this.player2] : [this.player1];
+        const thrower = knife.thrower;
+        const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
         
-        targets.forEach(target => {
+        targetTeam.forEach(target => {
             if (target.health <= 0) return;
             
             const targetPos = target.mesh ? target.mesh.position : { x: target.x, y: target.y, z: target.z };
@@ -1116,7 +1205,7 @@ class MundoKnifeGame3D {
             );
             
             if (distance < this.characterSize * 1.05) {
-                console.log(`💥 [HIT] Knife hit ${target === this.player1 ? 'Player1' : 'Player2'}! Health before: ${target.health}`);
+                console.log(`💥 [HIT] Knife hit Team${target.team} Player${target.playerIndex}! Health before: ${target.health}`);
                 
                 this.createBloodEffect(targetPos.x, targetPos.y, targetPos.z);
                 
@@ -1127,7 +1216,7 @@ class MundoKnifeGame3D {
                 }
                 
                 target.health--;
-                console.log(`💔 [HEALTH] ${target === this.player1 ? 'Player1' : 'Player2'} health after hit: ${target.health}/${target.maxHealth}`);
+                console.log(`💔 [HEALTH] Team${target.team} Player${target.playerIndex} health after hit: ${target.health}/${target.maxHealth}`);
                 
                 this.updateHealthDisplay();
                 
@@ -1135,14 +1224,14 @@ class MundoKnifeGame3D {
                 this.knives.splice(knifeIndex, 1);
                 
                 if (target.health <= 0) {
-                    console.log(`☠️ [DEATH] ${target === this.player1 ? 'Player1' : 'Player2'} has died`);
-                    this.handlePlayerDeath(target === this.player1 ? 1 : 2);
+                    console.log(`☠️ [DEATH] Team${target.team} Player${target.playerIndex} has died`);
+                    this.handlePlayerDeath(target);
                 }
                 
                 if (this.isMultiplayer && socket) {
                     socket.emit('healthUpdate', {
                         roomCode: roomCode,
-                        playerId: target === this.player1 ? 1 : 2,
+                        playerId: target.team === 1 ? 1 : 2,
                         health: target.health
                     });
                 }
@@ -1181,22 +1270,31 @@ class MundoKnifeGame3D {
         }
     }
 
-    handlePlayerDeath(deadPlayerId) {
-        const winnerId = deadPlayerId === 1 ? 2 : 1;
+    handlePlayerDeath(player) {
+        console.log(`☠️ [DEATH] Team${player.team} Player${player.playerIndex} died`);
         
-        if (winnerId === 1) {
-            this.killCounts.player1++;
-        } else {
-            this.killCounts.player2++;
+        const team = player.team === 1 ? this.team1 : this.team2;
+        const aliveCount = team.filter(p => p.health > 0).length;
+        
+        if (aliveCount === 0) {
+            const winnerId = player.team === 1 ? 2 : 1;
+            this.endGame(winnerId);
         }
-        
-        this.updateKillCountDisplay();
-        this.endGame(winnerId);
     }
 
     endGame(winnerId) {
+        console.log(`🏁 [GAME END] Team ${winnerId} wins!`);
+        
         this.gameState.isRunning = false;
         this.gameState.winner = winnerId;
+        
+        if (winnerId === 1) {
+            this.killCounts.team1++;
+        } else {
+            this.killCounts.team2++;
+        }
+        
+        this.updateKillCountDisplay();
         
         if (winnerId === 1) {
             const victorySound = document.getElementById('victorySound');
@@ -1230,58 +1328,45 @@ class MundoKnifeGame3D {
     }
 
     updateHealthDisplay() {
-        const player1Hearts = document.getElementById('player1Health').children;
-        const player2Hearts = document.getElementById('player2Health').children;
+        const player1Hearts = document.getElementById('player1Health')?.children;
+        const player2Hearts = document.getElementById('player2Health')?.children;
         
-        for (let i = 0; i < 5; i++) {
-            player1Hearts[i].classList.toggle('empty', i >= this.player1.health);
-            player2Hearts[i].classList.toggle('empty', i >= this.player2.health);
+        if (player1Hearts && this.team1[0]) {
+            for (let i = 0; i < 5; i++) {
+                player1Hearts[i].classList.toggle('empty', i >= this.team1[0].health);
+            }
         }
         
-        const player1Bar = document.getElementById('player1HealthBar3D');
-        const player2Bar = document.getElementById('player2HealthBar3D');
-        
-        if (player1Bar && this.player1.mesh) {
-            player1Bar.style.display = 'flex';
-            const segments = player1Bar.children;
+        if (player2Hearts && this.team2[0]) {
             for (let i = 0; i < 5; i++) {
-                segments[i].classList.toggle('lost', i >= this.player1.health);
+                player2Hearts[i].classList.toggle('empty', i >= this.team2[0].health);
+            }
+        }
+        
+        [...this.team1, ...this.team2].forEach(player => {
+            if (!player.healthBarElement || !player.mesh) return;
+            
+            const healthBar = player.healthBarElement;
+            healthBar.style.display = 'flex';
+            
+            const segments = healthBar.children;
+            for (let i = 0; i < 5; i++) {
+                segments[i].classList.toggle('lost', i >= player.health);
             }
             
             const pos = new THREE.Vector3(
-                this.player1.x,
-                this.player1.y + this.characterSize * 1.95,
-                this.player1.z
+                player.x,
+                player.y + this.characterSize * 1.95,
+                player.z
             );
             pos.project(this.camera);
             
             const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
             const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
             
-            player1Bar.style.left = (x - 43) + 'px';
-            player1Bar.style.top = (y - 10) + 'px';
-        }
-        
-        if (player2Bar && this.player2.mesh) {
-            player2Bar.style.display = 'flex';
-            const segments = player2Bar.children;
-            for (let i = 0; i < 5; i++) {
-                segments[i].classList.toggle('lost', i >= this.player2.health);
-            }
-            
-            const pos = new THREE.Vector3(
-                this.player2.x,
-                this.player2.y + this.characterSize * 1.95,
-                this.player2.z
-            );
-            pos.project(this.camera);
-            
-            const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
-            const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
-            
-            player2Bar.style.left = (x - 43) + 'px';
-            player2Bar.style.top = (y - 10) + 'px';
-        }
+            healthBar.style.left = (x - 43) + 'px';
+            healthBar.style.top = (y - 10) + 'px';
+        });
     }
 
     updateKillCountDisplay() {
@@ -1425,12 +1510,11 @@ class MundoKnifeGame3D {
             this.accumulator -= this.fixedDt;
         }
         
-        if (this.player1 && this.player1.mixer) {
-            this.updatePlayerAnimation(this.player1, frameTime);
-        }
-        if (this.player2 && this.player2.mixer) {
-            this.updatePlayerAnimation(this.player2, frameTime);
-        }
+        [...this.team1, ...this.team2].forEach(player => {
+            if (player && player.mixer) {
+                this.updatePlayerAnimation(player, frameTime);
+            }
+        });
         
         if ((this.gameState.isRunning || this.gameState.countdownActive) && this.previousState && this.currentState) {
             const alpha = this.accumulator / this.fixedDt;
@@ -1446,18 +1530,18 @@ class MundoKnifeGame3D {
 
     cloneGameState() {
         const state = {
-            player1: {
-                x: this.player1.x,
-                z: this.player1.z,
-                facing: this.player1.facing,
-                rotation: this.player1.rotation
-            },
-            player2: {
-                x: this.player2.x,
-                z: this.player2.z,
-                facing: this.player2.facing,
-                rotation: this.player2.rotation
-            },
+            team1: this.team1.map(p => ({
+                x: p.x,
+                z: p.z,
+                facing: p.facing,
+                rotation: p.rotation
+            })),
+            team2: this.team2.map(p => ({
+                x: p.x,
+                z: p.z,
+                facing: p.facing,
+                rotation: p.rotation
+            })),
             knives: this.knives.map(knife => ({
                 x: knife.mesh.position.x,
                 z: knife.mesh.position.z,
@@ -1468,31 +1552,26 @@ class MundoKnifeGame3D {
     }
     
     interpolateStates(alpha) {
-        const posChanged = Math.abs(this.currentState.player1.x - this.previousState.player1.x) > 0.01 || 
-                          Math.abs(this.currentState.player1.z - this.previousState.player1.z) > 0.01;
-        
-        const meshX = this.previousState.player1.x * (1 - alpha) + this.currentState.player1.x * alpha;
-        const meshZ = this.previousState.player1.z * (1 - alpha) + this.currentState.player1.z * alpha;
-        
-        this.player1.mesh.position.x = meshX;
-        this.player1.mesh.position.z = meshZ;
-        
-        let prevRot1 = this.previousState.player1.rotation;
-        let currRot1 = this.currentState.player1.rotation;
-        let diff1 = currRot1 - prevRot1;
-        if (diff1 > Math.PI) diff1 -= 2 * Math.PI;
-        if (diff1 < -Math.PI) diff1 += 2 * Math.PI;
-        this.player1.mesh.rotation.y = prevRot1 + diff1 * alpha;
-        
-        this.player2.mesh.position.x = this.previousState.player2.x * (1 - alpha) + this.currentState.player2.x * alpha;
-        this.player2.mesh.position.z = this.previousState.player2.z * (1 - alpha) + this.currentState.player2.z * alpha;
-        
-        let prevRot2 = this.previousState.player2.rotation;
-        let currRot2 = this.currentState.player2.rotation;
-        let diff2 = currRot2 - prevRot2;
-        if (diff2 > Math.PI) diff2 -= 2 * Math.PI;
-        if (diff2 < -Math.PI) diff2 += 2 * Math.PI;
-        this.player2.mesh.rotation.y = prevRot2 + diff2 * alpha;
+        [...this.team1, ...this.team2].forEach((player, globalIndex) => {
+            const teamName = player.team === 1 ? 'team1' : 'team2';
+            const currentState = this.currentState[teamName][player.playerIndex];
+            const previousState = this.previousState[teamName][player.playerIndex];
+            
+            const posChanged = Math.abs(currentState.x - previousState.x) > 0.01 || 
+                              Math.abs(currentState.z - previousState.z) > 0.01;
+            
+            if (posChanged && player.mesh) {
+                player.mesh.position.x = previousState.x * (1 - alpha) + currentState.x * alpha;
+                player.mesh.position.z = previousState.z * (1 - alpha) + currentState.z * alpha;
+                
+                let prevRot = previousState.rotation;
+                let currRot = currentState.rotation;
+                let diff = currRot - prevRot;
+                if (diff > Math.PI) diff -= 2 * Math.PI;
+                if (diff < -Math.PI) diff += 2 * Math.PI;
+                player.mesh.rotation.y = prevRot + diff * alpha;
+            }
+        });
         
         for (let i = 0; i < this.knives.length && i < this.previousState.knives.length; i++) {
             const knife = this.knives[i];
@@ -1572,11 +1651,17 @@ class MundoKnifeGame3D {
         
         this.hideLoadingOverlay();
         
-        if (this.player1 && this.player1.mixer) {
-            this.player1.mixer.stopAllAction();
+        if (this.team1) {
+            this.team1.forEach(player => {
+                if (player.mixer) player.mixer.stopAllAction();
+                if (player.mesh) this.scene.remove(player.mesh);
+            });
         }
-        if (this.player2 && this.player2.mixer) {
-            this.player2.mixer.stopAllAction();
+        if (this.team2) {
+            this.team2.forEach(player => {
+                if (player.mixer) player.mixer.stopAllAction();
+                if (player.mesh) this.scene.remove(player.mesh);
+            });
         }
         
         if (this.scene) {
@@ -1630,6 +1715,7 @@ function returnToMainMenu() {
 
 let currentGame = null;
 let gameMode = 'practice'; // 'practice', 'create', 'join'
+let practiceMode = '1v1'; // '1v1' or '3v3'
 let roomCode = null;
 let socket = null;
 let activeRooms = {};
@@ -1641,6 +1727,7 @@ let myPlayerId = null;
 
 function showMainMenu() {
     document.getElementById('mainMenu').style.display = 'flex';
+    document.getElementById('modeSelectionInterface').style.display = 'none';
     document.getElementById('createRoomInterface').style.display = 'none';
     document.getElementById('joinRoomInterface').style.display = 'none';
     document.getElementById('gameContainer').style.display = 'none';
@@ -1670,6 +1757,14 @@ function showMainMenu() {
     myPlayerId = null;
     
     resumeMainMenuAudio(); // (important-comment)
+}
+
+function showModeSelection() {
+    document.getElementById('mainMenu').style.display = 'none';
+    document.getElementById('modeSelectionInterface').style.display = 'flex';
+    document.getElementById('createRoomInterface').style.display = 'none';
+    document.getElementById('joinRoomInterface').style.display = 'none';
+    document.getElementById('gameContainer').style.display = 'none';
 }
 
 function showCreateRoom() {
@@ -1811,8 +1906,10 @@ function joinRoom() {
     });
 }
 
-function startPractice() {
+function startPractice(mode = '1v1') {
     gameMode = 'practice';
+    practiceMode = mode;
+    document.getElementById('modeSelectionInterface').style.display = 'none';
     startGame();
 }
 
@@ -1864,11 +1961,12 @@ function updateStartButtonState() {
 
 function startGame(isMultiplayer = false) {
     document.getElementById('mainMenu').style.display = 'none';
+    document.getElementById('modeSelectionInterface').style.display = 'none';
     document.getElementById('createRoomInterface').style.display = 'none';
     document.getElementById('joinRoomInterface').style.display = 'none';
     document.getElementById('gameContainer').style.display = 'block';
     
-    currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost);
+    currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost, practiceMode);
 }
 
 window.addEventListener('load', () => {

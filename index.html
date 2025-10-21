@@ -627,7 +627,33 @@
         <div class="menu-buttons">
             <button class="menu-btn" onclick="playButtonClickSound(); showCreateRoom()">Create Room</button>
             <button class="menu-btn" onclick="playButtonClickSound(); showJoinRoom()">Join Room</button>
-            <button class="menu-btn" onclick="playButtonClickSound(); startPractice()">Practise with AI</button>
+            <button class="menu-btn" onclick="playButtonClickSound(); showModeSelection()">Practise with AI</button>
+        </div>
+    </div>
+
+    <div class="room-interface" id="modeSelectionInterface">
+        <video class="main-menu-video" autoplay loop muted playsinline preload="auto">
+            <source src="dual_blade_hell_dynamic_5s.webm" type="video/webm">
+            <source src="dual_blade_hell_dynamic_5s.mp4" type="video/mp4">
+        </video>
+        <div class="main-menu-overlay"></div>
+        <button class="back-btn" onclick="showMainMenu()">← Back</button>
+        <div class="room-content">
+            <h1 class="game-title">Mundo-cleaver</h1>
+            <h2>Select Game Mode</h2>
+            <p>Choose your battle mode:</p>
+            <div class="menu-buttons" style="margin-top: 40px;">
+                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('1v1')" style="font-size: 1.3rem; padding: 20px 40px;">
+                    1v1
+                    <br>
+                    <span style="font-size: 0.8rem; opacity: 0.8;">You vs 1 AI</span>
+                </button>
+                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('3v3')" style="font-size: 1.3rem; padding: 20px 40px;">
+                    3v3
+                    <br>
+                    <span style="font-size: 0.8rem; opacity: 0.8;">You + 2 AI vs 3 AI</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1100,6 +1126,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=310"></script>
+    <script src="game3d.js?v=311"></script>
 </body>
 </html>
