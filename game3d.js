@@ -745,6 +745,11 @@ class MundoKnifeGame3D {
     }
 
     handlePlayerMovement(event) {
+        if (this.player1.health <= 0) {
+            console.log(`☠️ [MOVEMENT] Player is dead, cannot move`);
+            return;
+        }
+        
         const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
         const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
         
@@ -807,6 +812,11 @@ class MundoKnifeGame3D {
     }
 
     throwKnifeTowardsMouse() {
+        if (this.player1.health <= 0) {
+            console.log(`☠️ [ATTACK] Player is dead, cannot throw knife`);
+            return;
+        }
+        
         const now = Date.now();
         
         if (!this.player1.canAttack) {
@@ -1699,7 +1709,7 @@ function restartGame() {
         if (currentGame) {
             currentGame.dispose();
         }
-        startPractice();
+        startPractice(practiceMode);
     } else {
         showMainMenu();
     }
