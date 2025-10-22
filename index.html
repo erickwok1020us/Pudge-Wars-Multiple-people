@@ -1,13 +1,44 @@
 <!DOCTYPE html>
 <!--
     Mundo Cleaver - Main HTML File
-    Version: v314
+    Version: v320
     Last Updated: 2025-10-22
+    
+    Changes in v320:
+    - Made blur area minimal with width: fit-content for .room-content
+    - Reduced padding from 20px 30px to 15px 25px for tighter blur area
+    - Reduced input box width from 250px to 200px
+    - Reduced input box padding and margin for more compact design
+    - Updated cache version to v=320
+    
+    Changes in v319:
+    - Fixed MUNDO-CLEAVER logo centering by adding display: block and margin: auto
+    - Fixed dialog box centering by adding margin: 0 auto to .room-content
+    - Updated cache version to v=319
+    
+    Changes in v318:
+    - Increased MUNDO-CLEAVER logo size by 2x (from clamp(2.5rem, 6vw, 4rem) to clamp(5rem, 12vw, 8rem))
+    - Reduced .room-content padding from 40px to 20px 30px and max-width from 800px to 500px
+    - Reduced .room-input width from 100% to 250px for shorter input box
+    - Updated cache version to v=318
+    
+    Changes in v317:
+    - Changed AI knife throwing cooldown from 4.5 seconds to 5.0 seconds
+    - Updated cache version to v=317
+    
+    Changes in v316:
+    - Replaced "Mundo-Cleaver" text with animated GIF logo (Mundo-Cleaver-23-10-2025.gif)
+    - Added .game-title-image CSS class with responsive sizing matching original text
+    - Updated all 4 title locations (Main Menu, Mode Selection, Create Room, Join Room)
+    
+    Changes in v315:
+    - Changed AI knife throwing cooldown from 4.0 seconds to 4.5 seconds
     
     Changes in v314:
     - Updated all background videos to vidu-video-3002726427097011.mp4
     - Unified video sizing with black bars on sides (object-fit: contain)
-    - Removed old background videos (Pudge-Wars-Multiple-people video.mp4, dual_blade_hell_dynamic_5s.mp4, lava_background_flicker_half_5s.mp4)
+    - Fixed .room-interface background to pure black (#000) for consistency
+    - Removed old background videos
     - Updated cache version to v=314
 -->
 <html lang="en">
@@ -340,11 +371,31 @@
             z-index: 1;
             letter-spacing: 2px;
         }
+        
+        .game-title-image {
+            height: clamp(5rem, 12vw, 8rem);
+            width: auto;
+            margin-bottom: 50px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+            position: relative;
+            z-index: 1;
+            filter: drop-shadow(0 0 20px rgba(255, 107, 107, 0.5)) drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.8));
+        }
 
         .room-content .game-title {
             font-size: clamp(2rem, 5vw, 3.5rem);
             letter-spacing: 1px;
             margin-bottom: 30px;
+        }
+        
+        .room-content .game-title-image {
+            height: clamp(4rem, 10vw, 7rem);
+            margin-bottom: 30px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
         }
 
         .menu-buttons {
@@ -385,7 +436,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background: #000;
             display: none;
             flex-direction: column;
             justify-content: center;
@@ -395,13 +446,13 @@
 
         .room-content {
             background: var(--card-bg);
-            padding: 40px;
+            padding: 15px 25px;
             border-radius: var(--border-radius);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             text-align: center;
-            max-width: 800px;
-            width: 90%;
+            width: fit-content;
+            max-width: 90vw;
         }
 
         .room-code {
@@ -415,14 +466,15 @@
         }
 
         .room-input {
-            padding: 15px;
+            padding: 12px 15px;
             font-size: 18px;
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: var(--border-radius);
             background: var(--card-bg);
             color: var(--text-primary);
-            margin: 20px 0;
-            width: 100%;
+            margin: 15px 0;
+            width: 200px;
+            max-width: 100%;
             text-align: center;
         }
 
@@ -490,6 +542,11 @@
                 margin-bottom: 30px;
                 white-space: nowrap;
             }
+            
+            .game-title-image {
+                height: 2rem;
+                margin-bottom: 30px;
+            }
 
             .menu-btn {
                 padding: 12px 30px;
@@ -498,7 +555,8 @@
             }
 
             .room-content {
-                padding: 20px;
+                padding: 15px 20px;
+                max-width: 400px;
             }
 
             .player-slots {
@@ -633,7 +691,7 @@
             <source src="victorymale-version-230553.mp3" type="audio/mpeg">
         </audio>
         <div class="main-menu-overlay"></div>
-        <h1 class="game-title">Mundo-cleaver</h1>
+        <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
         <div class="menu-buttons">
             <button class="menu-btn" onclick="playButtonClickSound(); showCreateRoom()">Create Room</button>
             <button class="menu-btn" onclick="playButtonClickSound(); showJoinRoom()">Join Room</button>
@@ -648,7 +706,7 @@
         <div class="main-menu-overlay"></div>
         <button class="back-btn" onclick="showMainMenu()">← Back</button>
         <div class="room-content">
-            <h1 class="game-title">Mundo-cleaver</h1>
+            <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
             <h2>Select Game Mode</h2>
             <p>Choose your battle mode:</p>
             <div class="menu-buttons" style="margin-top: 40px;">
@@ -673,7 +731,7 @@
         <div class="main-menu-overlay"></div>
         <button class="back-btn" onclick="showMainMenu()">← Back</button>
         <div class="room-content">
-            <h1 class="game-title">Mundo-cleaver</h1>
+            <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
             <div id="modeSelection" style="display: block;">
                 <h2>Select Game Mode</h2>
                 <p>Choose your battle mode:</p>
@@ -711,7 +769,7 @@
         <div class="main-menu-overlay"></div>
         <button class="back-btn" onclick="showMainMenu()">← Back</button>
         <div class="room-content">
-            <h1 class="game-title">Mundo-cleaver</h1>
+            <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
             <h2>Join Room</h2>
             <p>Enter the room code to join a game:</p>
             <input type="text" class="room-input" id="roomCodeInput" placeholder="Enter room code..." maxlength="6">
@@ -912,6 +970,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=314"></script>
+    <script src="game3d.js?v=320"></script>
 </body>
 </html>

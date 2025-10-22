@@ -1,7 +1,27 @@
 /**
  * Mundo Cleaver - Game3D Script
- * Version: v314
+ * Version: v320
  * Last Updated: 2025-10-22
+ * 
+ * Changes in v320:
+ * - No changes to game3d.js (only index.html updated for minimal blur area)
+ * 
+ * Changes in v319:
+ * - No changes to game3d.js (only index.html updated for centering fixes)
+ * 
+ * Changes in v318:
+ * - No changes to game3d.js (only index.html updated for UI improvements)
+ * 
+ * Changes in v317:
+ * - Changed AI knife throwing cooldown from 4500ms (4.5s) to 5000ms (5.0s)
+ * - Updated knifeCooldown for both team1 and team2 AI players (lines 401, 440)
+ * 
+ * Changes in v316:
+ * - No changes to game3d.js (only index.html updated for animated GIF logo)
+ * 
+ * Changes in v315:
+ * - Changed AI knife throwing cooldown from 4000ms (4.0s) to 4500ms (4.5s)
+ * - Updated knifeCooldown for both team1 and team2 AI players (lines 382, 421)
  * 
  * Changes in v314:
  * - No changes to game3d.js (only index.html updated for new background video)
@@ -391,7 +411,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 4000,
+                knifeCooldown: 5000,
                 mesh: null,
                 canAttack: index === 0,
                 isThrowingKnife: false,
@@ -430,7 +450,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 4000,
+                knifeCooldown: 5000,
                 mesh: null,
                 aiStartDelay: 0,
                 aiCanAttack: false,

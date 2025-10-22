@@ -1,24 +1,53 @@
-Pudge Wars v314 - 上傳說明
-====================================
+Mundo Cleaver v320 - Upload Instructions
+=========================================
 
-上傳到 GitHub 的文件：
-1. index.html - 替換現有的 index.html
-2. game3d.js - 替換現有的 game3d.js  
-3. vidu-video-3002726427097011.mp4 - 新增到根目錄
+Version: v320
+Date: 2025-10-22
 
-需要從 GitHub 刪除的舊文件：
-1. Pudge-Wars-Multiple-people video.mp4 (舊背景影片)
-2. dual_blade_hell_dynamic_5s.mp4 (舊背景影片)
-3. lava_background_flicker_half_5s.mp4 (舊背景影片)
-4. game3d_v313.js (舊版本文件)
-5. index_v313.html (舊版本文件)
-6. game3d_v314.js (舊版本文件)
-7. index_v314.html (舊版本文件)
-8. dual_blade_hell_dynamic_5s.webm (舊背景影片)
-9. video_poster.jpg (不再需要)
+Changes in v320:
+- Made blur area minimal with width: fit-content for .room-content
+- Reduced padding from 20px 30px to 15px 25px for tighter blur area
+- Reduced input box width from 250px to 200px
+- Reduced input box padding and margin for more compact design
+- Dialog boxes are now perfectly centered on the screen (horizontally and vertically)
+- Updated cache version to v=320
 
-v314 更新內容：
-- 所有頁面（主選單、CREATE ROOM、JOIN ROOM、LOADING）的背景影片統一更新為新影片
-- 影片大小統一，使用 object-fit: contain，左右突出部分顯示黑色
-- 緩存版本更新為 v=314
-- 保留 v313 的死亡動畫修復
+Visual Improvements:
+- Dialog boxes (CREATE ROOM, JOIN ROOM, WITH AI) are now in the absolute center of the screen
+- Blur background area is now minimal and tightly wraps around the MUNDO-CLEAVER logo and content
+- Background video (purple Mundo character) is now much more visible
+- Input boxes are shorter and more compact
+- Overall design is cleaner and less obstructive to the background video
+
+Files to Upload to GitHub:
+---------------------------
+1. index.html - Replace the existing index.html in your repository
+2. game3d.js - Replace the existing game3d.js in your repository
+
+Upload Steps:
+-------------
+1. Go to your GitHub repository: https://github.com/erickwok1020us/Pudge-Wars-Multiple-people
+2. Click on "index.html" and then click the pencil icon (Edit this file)
+3. Replace the entire content with the new index.html from this archive
+4. Commit the changes with message: "v320: Minimal blur area and perfect centering"
+5. Click on "game3d.js" and then click the pencil icon (Edit this file)
+6. Replace the entire content with the new game3d.js from this archive
+7. Commit the changes with message: "v320: Updated version comments"
+
+Testing:
+--------
+After uploading, test the game to verify:
+- Dialog boxes are perfectly centered on the screen (horizontally and vertically)
+- Blur background area is minimal and tightly wraps around content
+- Background video is clearly visible
+- Input boxes are shorter and more compact
+- All other game features work normally
+
+Notes:
+------
+- This update focuses on UI/UX improvements for better visual design
+- No game logic was modified
+- The AI knife cooldown from v317 (5.0 seconds) is preserved
+- The logo size from v318 (2x larger) is preserved
+- The animated GIF logo from v316 is preserved
+- The background video from v314 is preserved
