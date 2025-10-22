@@ -1,38 +1,3 @@
-/**
- * Mundo Cleaver - Game3D Script
- * Version: v321
- * Last Updated: 2025-10-22
- * 
- * Changes in v321:
- * - No changes to game3d.js (only index.html updated for back button position and logo size)
- * 
- * Changes in v320:
- * - No changes to game3d.js (only index.html updated for minimal blur area)
- * 
- * Changes in v319:
- * - No changes to game3d.js (only index.html updated for centering fixes)
- * 
- * Changes in v318:
- * - No changes to game3d.js (only index.html updated for UI improvements)
- * 
- * Changes in v317:
- * - Changed AI knife throwing cooldown from 4500ms (4.5s) to 5000ms (5.0s)
- * - Updated knifeCooldown for both team1 and team2 AI players (lines 401, 440)
- * 
- * Changes in v316:
- * - No changes to game3d.js (only index.html updated for animated GIF logo)
- * 
- * Changes in v315:
- * - Changed AI knife throwing cooldown from 4000ms (4.0s) to 4500ms (4.5s)
- * - Updated knifeCooldown for both team1 and team2 AI players (lines 382, 421)
- * 
- * Changes in v314:
- * - No changes to game3d.js (only index.html updated for new background video)
- * 
- * Changes in v313:
- * - Fixed death animation to stay in fallen position (added clampWhenFinished = true at line 535)
- */
-
 const CDN_BASE_URL = 'https://pub-2d994ab822d5426bad338ecb218683d8.r2.dev';
 
 class MundoKnifeGame3D {
@@ -414,7 +379,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 5000,
+                knifeCooldown: 4000,
                 mesh: null,
                 canAttack: index === 0,
                 isThrowingKnife: false,
@@ -453,7 +418,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 5000,
+                knifeCooldown: 4000,
                 mesh: null,
                 aiStartDelay: 0,
                 aiCanAttack: false,
@@ -567,7 +532,6 @@ class MundoKnifeGame3D {
         player.animations.idle.loop = THREE.LoopRepeat;
         player.animations.run.loop = THREE.LoopRepeat;
         player.animations.death.loop = THREE.LoopOnce;
-        player.animations.death.clampWhenFinished = true;
         
         player.animations.idle.play();
         player.currentAnimation = player.animations.idle;

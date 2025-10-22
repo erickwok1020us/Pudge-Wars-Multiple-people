@@ -1,52 +1,16 @@
 <!DOCTYPE html>
 <!--
     Mundo Cleaver - Main HTML File
-    Version: v321
+    Version: v322
     Last Updated: 2025-10-22
     
-    Changes in v321:
-    - Moved back button to bottom right corner of .room-content (from top left)
-    - Kept MUNDO-CLEAVER logo at original size (clamp(5rem, 12vw, 8rem))
-    - Kept dialog logo at original size (clamp(4rem, 10vw, 7rem))
-    - Added bottom padding to .room-content to accommodate back button
-    - Updated cache version to v=321
-    
-    Changes in v320:
-    - Made blur area minimal with width: fit-content for .room-content
-    - Reduced padding from 20px 30px to 15px 25px for tighter blur area
-    - Reduced input box width from 250px to 200px
-    - Reduced input box padding and margin for more compact design
-    - Updated cache version to v=320
-    
-    Changes in v319:
-    - Fixed MUNDO-CLEAVER logo centering by adding display: block and margin: auto
-    - Fixed dialog box centering by adding margin: 0 auto to .room-content
-    - Updated cache version to v=319
-    
-    Changes in v318:
-    - Increased MUNDO-CLEAVER logo size by 2x (from clamp(2.5rem, 6vw, 4rem) to clamp(5rem, 12vw, 8rem))
-    - Reduced .room-content padding from 40px to 20px 30px and max-width from 800px to 500px
-    - Reduced .room-input width from 100% to 250px for shorter input box
-    - Updated cache version to v=318
-    
-    Changes in v317:
-    - Changed AI knife throwing cooldown from 4.5 seconds to 5.0 seconds
-    - Updated cache version to v=317
-    
-    Changes in v316:
-    - Replaced "Mundo-Cleaver" text with animated GIF logo (Mundo-Cleaver-23-10-2025.gif)
-    - Added .game-title-image CSS class with responsive sizing matching original text
-    - Updated all 4 title locations (Main Menu, Mode Selection, Create Room, Join Room)
-    
-    Changes in v315:
-    - Changed AI knife throwing cooldown from 4.0 seconds to 4.5 seconds
-    
-    Changes in v314:
-    - Updated all background videos to vidu-video-3002726427097011.mp4
-    - Unified video sizing with black bars on sides (object-fit: contain)
-    - Fixed .room-interface background to pure black (#000) for consistency
-    - Removed old background videos
-    - Updated cache version to v=314
+    Changes in v322:
+    - Moved back button INSIDE .room-content div (now in bottom right of blur box)
+    - Increased "Select Game Mode" font size from 2rem to 4rem (2x)
+    - Increased "Choose your battle mode:" font size from 1rem to 2rem (2x)
+    - Increased "1v1" and "3v3" button font size from 1.3rem to 2.6rem (2x)
+    - Increased button subtitle font size from 0.8rem to 1.6rem (2x)
+    - Updated cache version to v=322
 -->
 <html lang="en">
 <head>
@@ -347,8 +311,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 100%;
-            height: 100%;
+            width: 90%;
+            height: 90%;
             transform: translate(-50%, -50%);
             z-index: -1;
             object-fit: contain;
@@ -378,17 +342,14 @@
             z-index: 1;
             letter-spacing: 2px;
         }
-        
+
         .game-title-image {
-            height: clamp(5rem, 12vw, 8rem);
-            width: auto;
+            width: clamp(300px, 50vw, 600px);
+            height: auto;
             margin-bottom: 50px;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
             position: relative;
             z-index: 1;
-            filter: drop-shadow(0 0 20px rgba(255, 107, 107, 0.5)) drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.8));
+            filter: drop-shadow(0 0 20px rgba(255, 107, 107, 0.5));
         }
 
         .room-content .game-title {
@@ -396,13 +357,10 @@
             letter-spacing: 1px;
             margin-bottom: 30px;
         }
-        
+
         .room-content .game-title-image {
-            height: clamp(4rem, 10vw, 7rem);
+            width: clamp(250px, 45vw, 500px);
             margin-bottom: 30px;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
         }
 
         .menu-buttons {
@@ -453,13 +411,13 @@
 
         .room-content {
             background: var(--card-bg);
-            padding: 15px 25px 60px 25px;
+            padding: 40px 40px 60px 40px;
             border-radius: var(--border-radius);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             text-align: center;
-            width: fit-content;
-            max-width: 90vw;
+            max-width: 800px;
+            width: 90%;
             position: relative;
         }
 
@@ -474,15 +432,14 @@
         }
 
         .room-input {
-            padding: 12px 15px;
+            padding: 15px;
             font-size: 18px;
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: var(--border-radius);
             background: var(--card-bg);
             color: var(--text-primary);
-            margin: 15px 0;
-            width: 200px;
-            max-width: 100%;
+            margin: 20px 0;
+            width: 100%;
             text-align: center;
         }
 
@@ -551,11 +508,6 @@
                 margin-bottom: 30px;
                 white-space: nowrap;
             }
-            
-            .game-title-image {
-                height: 2rem;
-                margin-bottom: 30px;
-            }
 
             .menu-btn {
                 padding: 12px 30px;
@@ -564,8 +516,7 @@
             }
 
             .room-content {
-                padding: 15px 20px;
-                max-width: 400px;
+                padding: 20px;
             }
 
             .player-slots {
@@ -713,23 +664,23 @@
             <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <div class="main-menu-overlay"></div>
-        <button class="back-btn" onclick="showMainMenu()">← Back</button>
         <div class="room-content">
             <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
-            <h2>Select Game Mode</h2>
-            <p>Choose your battle mode:</p>
+            <h2 style="font-size: 2rem;">Select Game Mode</h2>
+            <p style="font-size: 2rem;">Choose your battle mode:</p>
             <div class="menu-buttons" style="margin-top: 40px;">
-                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('1v1')" style="font-size: 1.3rem; padding: 20px 40px;">
+                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('1v1')" style="font-size: 2.6rem; padding: 20px 40px;">
                     1v1
                     <br>
-                    <span style="font-size: 0.8rem; opacity: 0.8;">You vs 1 AI</span>
+                    <span style="font-size: 1.6rem; opacity: 0.8;">You vs 1 AI</span>
                 </button>
-                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('3v3')" style="font-size: 1.3rem; padding: 20px 40px;">
+                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('3v3')" style="font-size: 2.6rem; padding: 20px 40px;">
                     3v3
                     <br>
-                    <span style="font-size: 0.8rem; opacity: 0.8;">You + 2 AI vs 3 AI</span>
+                    <span style="font-size: 1.6rem; opacity: 0.8;">You + 2 AI vs 3 AI</span>
                 </button>
             </div>
+            <button class="back-btn" onclick="showMainMenu()">← Back</button>
         </div>
     </div>
 
@@ -738,22 +689,21 @@
             <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <div class="main-menu-overlay"></div>
-        <button class="back-btn" onclick="showMainMenu()">← Back</button>
         <div class="room-content">
             <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
             <div id="modeSelection" style="display: block;">
-                <h2>Select Game Mode</h2>
-                <p>Choose your battle mode:</p>
+                <h2 style="font-size: 2rem;">Select Game Mode</h2>
+                <p style="font-size: 2rem;">Choose your battle mode:</p>
                 <div class="menu-buttons" style="margin-top: 40px;">
-                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('1v1')" style="font-size: 1.3rem; padding: 20px 40px;">
+                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('1v1')" style="font-size: 2.6rem; padding: 20px 40px;">
                         1v1
                         <br>
-                        <span style="font-size: 0.8rem; opacity: 0.8;">2 Players</span>
+                        <span style="font-size: 1.6rem; opacity: 0.8;">2 Players</span>
                     </button>
-                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('3v3')" style="font-size: 1.3rem; padding: 20px 40px;">
+                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('3v3')" style="font-size: 2.6rem; padding: 20px 40px;">
                         3v3
                         <br>
-                        <span style="font-size: 0.8rem; opacity: 0.8;">6 Players (3 vs 3)</span>
+                        <span style="font-size: 1.6rem; opacity: 0.8;">6 Players (3 vs 3)</span>
                     </button>
                 </div>
             </div>
@@ -768,6 +718,7 @@
                     <button class="menu-btn" id="startGameBtn" onclick="startMultiplayerGame()" style="display: none; opacity: 0.3;" disabled>Start Game</button>
                 </div>
             </div>
+            <button class="back-btn" onclick="showMainMenu()">← Back</button>
         </div>
     </div>
 
@@ -776,7 +727,6 @@
             <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <div class="main-menu-overlay"></div>
-        <button class="back-btn" onclick="showMainMenu()">← Back</button>
         <div class="room-content">
             <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
             <h2>Join Room</h2>
@@ -786,6 +736,7 @@
             <button class="menu-btn" onclick="joinRoom()">Join Game</button>
             <button class="menu-btn" id="readyBtnJoin" onclick="toggleReady()" style="display: none; margin-top: 20px;">Ready</button>
             <div id="joinStatus" style="margin-top: 20px;"></div>
+            <button class="back-btn" onclick="showMainMenu()">← Back</button>
         </div>
     </div>
 
@@ -793,7 +744,7 @@
         <div id="gameCanvas"></div>
         
         <div id="loadingOverlay" style="display: none; background: #000000;">
-            <video autoplay muted loop playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0.5;">
+            <video autoplay muted loop playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(0.9); opacity: 0.5;">
                 <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
             </video>
             <div class="loading-content" style="position: relative; z-index: 1;">
@@ -979,6 +930,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=321"></script>
+    <script src="game3d.js?v=323"></script>
 </body>
 </html>
