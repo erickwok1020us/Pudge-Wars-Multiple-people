@@ -1,7 +1,10 @@
 /**
  * Mundo Cleaver - Game3D Script
- * Version: v320
+ * Version: v321
  * Last Updated: 2025-10-22
+ * 
+ * Changes in v321:
+ * - No changes to game3d.js (only index.html updated for back button position and logo size)
  * 
  * Changes in v320:
  * - No changes to game3d.js (only index.html updated for minimal blur area)

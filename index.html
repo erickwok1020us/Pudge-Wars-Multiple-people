@@ -1,8 +1,15 @@
 <!DOCTYPE html>
 <!--
     Mundo Cleaver - Main HTML File
-    Version: v320
+    Version: v321
     Last Updated: 2025-10-22
+    
+    Changes in v321:
+    - Moved back button to bottom right corner of .room-content (from top left)
+    - Kept MUNDO-CLEAVER logo at original size (clamp(5rem, 12vw, 8rem))
+    - Kept dialog logo at original size (clamp(4rem, 10vw, 7rem))
+    - Added bottom padding to .room-content to accommodate back button
+    - Updated cache version to v=321
     
     Changes in v320:
     - Made blur area minimal with width: fit-content for .room-content
@@ -446,13 +453,14 @@
 
         .room-content {
             background: var(--card-bg);
-            padding: 15px 25px;
+            padding: 15px 25px 60px 25px;
             border-radius: var(--border-radius);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             text-align: center;
             width: fit-content;
             max-width: 90vw;
+            position: relative;
         }
 
         .room-code {
@@ -511,8 +519,8 @@
 
         .back-btn {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            bottom: 15px;
+            right: 15px;
             padding: 10px 20px;
             background: var(--card-bg);
             border: 1px solid rgba(255, 255, 255, 0.3);
@@ -520,6 +528,7 @@
             color: var(--text-primary);
             cursor: pointer;
             transition: var(--transition);
+            z-index: 10;
         }
 
         .back-btn:hover {
@@ -970,6 +979,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=320"></script>
+    <script src="game3d.js?v=321"></script>
 </body>
 </html>
