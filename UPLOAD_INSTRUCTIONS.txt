@@ -1,0 +1,24 @@
+Pudge Wars v314 - 上傳說明
+====================================
+
+上傳到 GitHub 的文件：
+1. index.html - 替換現有的 index.html
+2. game3d.js - 替換現有的 game3d.js  
+3. vidu-video-3002726427097011.mp4 - 新增到根目錄
+
+需要從 GitHub 刪除的舊文件：
+1. Pudge-Wars-Multiple-people video.mp4 (舊背景影片)
+2. dual_blade_hell_dynamic_5s.mp4 (舊背景影片)
+3. lava_background_flicker_half_5s.mp4 (舊背景影片)
+4. game3d_v313.js (舊版本文件)
+5. index_v313.html (舊版本文件)
+6. game3d_v314.js (舊版本文件)
+7. index_v314.html (舊版本文件)
+8. dual_blade_hell_dynamic_5s.webm (舊背景影片)
+9. video_poster.jpg (不再需要)
+
+v314 更新內容：
+- 所有頁面（主選單、CREATE ROOM、JOIN ROOM、LOADING）的背景影片統一更新為新影片
+- 影片大小統一，使用 object-fit: contain，左右突出部分顯示黑色
+- 緩存版本更新為 v=314
+- 保留 v313 的死亡動畫修復

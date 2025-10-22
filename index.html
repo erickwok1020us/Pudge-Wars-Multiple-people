@@ -1,4 +1,15 @@
 <!DOCTYPE html>
+<!--
+    Mundo Cleaver - Main HTML File
+    Version: v314
+    Last Updated: 2025-10-22
+    
+    Changes in v314:
+    - Updated all background videos to vidu-video-3002726427097011.mp4
+    - Unified video sizing with black bars on sides (object-fit: contain)
+    - Removed old background videos (Pudge-Wars-Multiple-people video.mp4, dual_blade_hell_dynamic_5s.mp4, lava_background_flicker_half_5s.mp4)
+    - Updated cache version to v=314
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -298,8 +309,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 90%;
-            height: 90%;
+            width: 100%;
+            height: 100%;
             transform: translate(-50%, -50%);
             z-index: -1;
             object-fit: contain;
@@ -594,8 +605,8 @@
 </head>
 <body>
     <div class="main-menu" id="mainMenu">
-        <video class="main-menu-video" autoplay loop muted playsinline preload="auto" poster="video_poster.jpg">
-            <source src="Pudge-Wars-Multiple-people video.mp4" type="video/mp4">
+        <video class="main-menu-video" autoplay loop muted playsinline preload="auto">
+            <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <audio id="mainMenuAudio" autoplay loop muted preload="auto">
             <source src="audio-editor-output.mp3" type="audio/mpeg">
@@ -632,7 +643,7 @@
 
     <div class="room-interface" id="modeSelectionInterface">
         <video class="main-menu-video" autoplay loop muted playsinline preload="auto">
-            <source src="Pudge-Wars-Multiple-people video.mp4" type="video/mp4">
+            <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <div class="main-menu-overlay"></div>
         <button class="back-btn" onclick="showMainMenu()">← Back</button>
@@ -657,7 +668,7 @@
 
     <div class="room-interface" id="createRoomInterface">
         <video class="main-menu-video" autoplay loop muted playsinline preload="auto">
-            <source src="Pudge-Wars-Multiple-people video.mp4" type="video/mp4">
+            <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <div class="main-menu-overlay"></div>
         <button class="back-btn" onclick="showMainMenu()">← Back</button>
@@ -695,7 +706,7 @@
 
     <div class="room-interface" id="joinRoomInterface">
         <video class="main-menu-video" autoplay loop muted playsinline preload="auto">
-            <source src="Pudge-Wars-Multiple-people video.mp4" type="video/mp4">
+            <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <div class="main-menu-overlay"></div>
         <button class="back-btn" onclick="showMainMenu()">← Back</button>
@@ -715,8 +726,8 @@
         <div id="gameCanvas"></div>
         
         <div id="loadingOverlay" style="display: none; background: #000000;">
-            <video autoplay muted loop playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(0.9); opacity: 0.5;">
-                <source src="Pudge-Wars-Multiple-people video.mp4" type="video/mp4">
+            <video autoplay muted loop playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0.5;">
+                <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
             </video>
             <div class="loading-content" style="position: relative; z-index: 1;">
                 <h2>Loading Game</h2>
@@ -901,6 +912,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=312"></script>
+    <script src="game3d.js?v=314"></script>
 </body>
 </html>

@@ -1,3 +1,15 @@
+/**
+ * Mundo Cleaver - Game3D Script
+ * Version: v314
+ * Last Updated: 2025-10-22
+ * 
+ * Changes in v314:
+ * - No changes to game3d.js (only index.html updated for new background video)
+ * 
+ * Changes in v313:
+ * - Fixed death animation to stay in fallen position (added clampWhenFinished = true at line 535)
+ */
+
 const CDN_BASE_URL = 'https://pub-2d994ab822d5426bad338ecb218683d8.r2.dev';
 
 class MundoKnifeGame3D {
@@ -532,6 +544,7 @@ class MundoKnifeGame3D {
         player.animations.idle.loop = THREE.LoopRepeat;
         player.animations.run.loop = THREE.LoopRepeat;
         player.animations.death.loop = THREE.LoopOnce;
+        player.animations.death.clampWhenFinished = true;
         
         player.animations.idle.play();
         player.currentAnimation = player.animations.idle;
