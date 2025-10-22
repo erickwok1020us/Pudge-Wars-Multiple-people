@@ -421,10 +421,10 @@
         }
 
         .player-slots {
-            display: flex;
-            justify-content: space-between;
-            margin: 30px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
+            margin: 30px 0;
         }
 
         .player-slot {
@@ -663,22 +663,32 @@
         <button class="back-btn" onclick="showMainMenu()">← Back</button>
         <div class="room-content">
             <h1 class="game-title">Mundo-cleaver</h1>
-            <h2>Create Room</h2>
-            <p>Share this room code with your friend:</p>
-            <div class="room-code" id="roomCode">Loading...</div>
-            <div class="player-slots">
-                <div class="player-slot occupied">
-                    <h3>Player 1 (You)</h3>
-                    <p id="player1Status">Not Ready</p>
-                </div>
-                <div class="player-slot empty" id="player2Slot">
-                    <h3>Player 2</h3>
-                    <p>Waiting for opponent...</p>
+            <div id="modeSelection" style="display: block;">
+                <h2>Select Game Mode</h2>
+                <p>Choose your battle mode:</p>
+                <div class="menu-buttons" style="margin-top: 40px;">
+                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('1v1')" style="font-size: 1.3rem; padding: 20px 40px;">
+                        1v1
+                        <br>
+                        <span style="font-size: 0.8rem; opacity: 0.8;">2 Players</span>
+                    </button>
+                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('3v3')" style="font-size: 1.3rem; padding: 20px 40px;">
+                        3v3
+                        <br>
+                        <span style="font-size: 0.8rem; opacity: 0.8;">6 Players (3 vs 3)</span>
+                    </button>
                 </div>
             </div>
-            <div class="ready-start-buttons" style="display: flex; gap: 20px; justify-content: center; margin-top: 30px;">
-                <button class="menu-btn" id="readyBtn" onclick="toggleReady()">Ready</button>
-                <button class="menu-btn" id="startGameBtn" onclick="startMultiplayerGame()" style="display: none; opacity: 0.3;" disabled>Start Game</button>
+            <div id="roomDetails" style="display: none;">
+                <h2>Create Room</h2>
+                <p>Share this room code with your friend:</p>
+                <div class="room-code" id="roomCode">Loading...</div>
+                <div class="player-slots" id="playerSlots">
+                </div>
+                <div class="ready-start-buttons" style="display: flex; gap: 20px; justify-content: center; margin-top: 30px;">
+                    <button class="menu-btn" id="readyBtn" onclick="toggleReady()">Ready</button>
+                    <button class="menu-btn" id="startGameBtn" onclick="startMultiplayerGame()" style="display: none; opacity: 0.3;" disabled>Start Game</button>
+                </div>
             </div>
         </div>
     </div>
@@ -884,243 +894,13 @@
             document.addEventListener('mouseenter', unmuteOnInteraction);
         });
         
-        // Global shared rooms object for cross-tab communication
-        if (!window.globalRooms) {
-            window.globalRooms = {};
-        }
-        
-        // Enhanced multiplayer system using BroadcastChannel for cross-tab communication
-        // and localStorage for persistence across browser sessions
-        function io() {
-            const eventHandlers = {};
-            const socketId = 'socket_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-            let broadcastChannel = null;
-            
-            // Initialize BroadcastChannel for same-origin communication
-            try {
-                broadcastChannel = new BroadcastChannel('mundo_cleaver_rooms');
-            } catch (e) {
-                console.warn('BroadcastChannel not supported, falling back to localStorage polling');
-            }
-            
-            return {
-                emit: function(event, data) {
-                    if (event === 'createRoom') {
-                        const roomData = { 
-                            host: socketId, 
-                            players: 1,
-                            created: Date.now(),
-                            lastActivity: Date.now()
-                        };
-                        
-                        window.globalRooms[data.roomCode] = roomData;
-                        localStorage.setItem('globalRooms', JSON.stringify(window.globalRooms));
-                        localStorage.setItem('room_' + data.roomCode, JSON.stringify(roomData));
-                        
-                        console.log('Room created:', data.roomCode);
-                        
-                        // Broadcast room creation
-                        if (broadcastChannel) {
-                            broadcastChannel.postMessage({
-                                type: 'roomCreated',
-                                roomCode: data.roomCode,
-                                roomData: roomData
-                            });
-                        }
-                    } else if (event === 'joinRoom') {
-                        // Check localStorage for room persistence across sessions
-                        const roomKey = 'room_' + data.roomCode;
-                        const roomData = localStorage.getItem(roomKey);
-                        
-                        if (roomData) {
-                            try {
-                                const room = JSON.parse(roomData);
-                                const now = Date.now();
-                                
-                                // Check if room is still active (within 10 minutes)
-                                if (now - room.lastActivity < 600000) {
-                                    if (room.players < 2) {
-                                        room.players = 2;
-                                        room.guest = socketId;
-                                        room.lastActivity = now;
-                                        
-                                        // Update room data
-                                        window.globalRooms[data.roomCode] = room;
-                                        localStorage.setItem('globalRooms', JSON.stringify(window.globalRooms));
-                                        localStorage.setItem(roomKey, JSON.stringify(room));
-                                        
-                                        // Notify host via BroadcastChannel and localStorage
-                                        const joinEvent = {
-                                            type: 'playerJoined',
-                                            roomCode: data.roomCode,
-                                            guestId: socketId,
-                                            timestamp: now
-                                        };
-                                        
-                                        if (broadcastChannel) {
-                                            broadcastChannel.postMessage(joinEvent);
-                                        }
-                                        localStorage.setItem('socketEvent_' + room.host, JSON.stringify(joinEvent));
-                                        
-                                        // Confirm join success
-                                        setTimeout(() => {
-                                            if (eventHandlers['joinSuccess']) {
-                                                eventHandlers['joinSuccess']({ roomCode: data.roomCode });
-                                            }
-                                        }, 100);
-                                    } else {
-                                        setTimeout(() => {
-                                            if (eventHandlers['roomFull']) {
-                                                eventHandlers['roomFull']({ roomCode: data.roomCode });
-                                            }
-                                        }, 100);
-                                    }
-                                } else {
-                                    // Room expired, clean up
-                                    localStorage.removeItem(roomKey);
-                                    delete window.globalRooms[data.roomCode];
-                                    localStorage.setItem('globalRooms', JSON.stringify(window.globalRooms));
-                                    
-                                    setTimeout(() => {
-                                        if (eventHandlers['joinError']) {
-                                            eventHandlers['joinError']({ roomCode: data.roomCode });
-                                        }
-                                    }, 100);
-                                }
-                            } catch (e) {
-                                console.error('Error parsing room data:', e);
-                                setTimeout(() => {
-                                    if (eventHandlers['joinError']) {
-                                        eventHandlers['joinError']({ roomCode: data.roomCode });
-                                    }
-                                }, 100);
-                            }
-                        } else {
-                            setTimeout(() => {
-                                if (eventHandlers['joinError']) {
-                                    eventHandlers['joinError']({ roomCode: data.roomCode });
-                                }
-                            }, 100);
-                        }
-                    } else if (event === 'playerMove' || event === 'knifeThrow' || event === 'healthUpdate' || event === 'ping') {
-                        const roomKey = 'room_' + data.roomCode;
-                        const roomData = localStorage.getItem(roomKey);
-                        
-                        if (roomData) {
-                            try {
-                                const room = JSON.parse(roomData);
-                                const targetSocket = socketId === room.host ? room.guest : room.host;
-                                
-                                if (targetSocket) {
-                                    const gameEvent = {
-                                        type: event === 'playerMove' ? 'opponentMove' : 
-                                              event === 'knifeThrow' ? 'opponentKnifeThrow' : 
-                                              event === 'healthUpdate' ? 'opponentHealthUpdate' :
-                                              'pong',
-                                        data: data,
-                                        timestamp: Date.now()
-                                    };
-                                    
-                                    // Send via BroadcastChannel for real-time communication
-                                    if (broadcastChannel) {
-                                        broadcastChannel.postMessage({
-                                            ...gameEvent,
-                                            targetSocket: targetSocket
-                                        });
-                                    }
-                                    
-                                    // Fallback to localStorage
-                                    localStorage.setItem('socketEvent_' + targetSocket, JSON.stringify(gameEvent));
-                                }
-                            } catch (e) {
-                                console.error('Error handling game event:', e);
-                            }
-                        }
-                    }
-                },
-                
-                on: function(event, handler) {
-                    eventHandlers[event] = handler;
-                },
-                
-                off: function(event) {
-                    delete eventHandlers[event];
-                },
-                
-                trigger: function(event, data) {
-                    if (eventHandlers[event]) {
-                        eventHandlers[event](data);
-                    }
-                },
-                
-                disconnect: function() {
-                    // Clean up rooms where this socket was involved
-                    const rooms = window.globalRooms;
-                    for (const roomCode in rooms) {
-                        if (rooms[roomCode].host === socketId || rooms[roomCode].guest === socketId) {
-                            localStorage.removeItem('room_' + roomCode);
-                            delete rooms[roomCode];
-                        }
-                    }
-                    localStorage.setItem('globalRooms', JSON.stringify(rooms));
-                    
-                    if (broadcastChannel) {
-                        broadcastChannel.close();
-                    }
-                },
-                
-                // Enhanced listening with BroadcastChannel support
-                startListening: function() {
-                    // Listen for BroadcastChannel messages
-                    if (broadcastChannel) {
-                        broadcastChannel.onmessage = (event) => {
-                            const message = event.data;
-                            
-                            // Handle messages targeted at this socket
-                            if (message.targetSocket === socketId && eventHandlers[message.type]) {
-                                eventHandlers[message.type](message.data || { roomCode: message.roomCode });
-                            }
-                            // Handle general room events
-                            else if (message.type === 'playerJoined' && eventHandlers['playerJoined']) {
-                                // Check if this is for a room we're hosting
-                                const room = window.globalRooms[message.roomCode];
-                                if (room && room.host === socketId) {
-                                    eventHandlers['playerJoined']({ roomCode: message.roomCode });
-                                }
-                            }
-                        };
-                    }
-                    
-                    // Fallback localStorage polling for cross-session communication
-                    const checkForEvents = () => {
-                        const eventKey = 'socketEvent_' + socketId;
-                        const eventData = localStorage.getItem(eventKey);
-                        if (eventData) {
-                            try {
-                                const event = JSON.parse(eventData);
-                                if (eventHandlers[event.type]) {
-                                    eventHandlers[event.type](event.data || { roomCode: event.roomCode });
-                                }
-                                localStorage.removeItem(eventKey);
-                            } catch (e) {
-                                console.error('Error parsing socket event:', e);
-                            }
-                        }
-                    };
-                    
-                    // Check for events every 200ms (reduced frequency with BroadcastChannel)
-                    setInterval(checkForEvents, 200);
-                    
-                    return this;
-                }
-            };
-        }
+        // Socket.IO client library (loaded below) will provide the real io() function
     </script>
     <script src="https://cdn.jsdelivr.net/npm/fflate@0.6.9/umd/index.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=311.3"></script>
+    <script src="game3d.js?v=312"></script>
 </body>
 </html>

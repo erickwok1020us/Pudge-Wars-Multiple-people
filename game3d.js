@@ -379,7 +379,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 2200,
+                knifeCooldown: 4000,
                 mesh: null,
                 canAttack: index === 0,
                 isThrowingKnife: false,
@@ -418,7 +418,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 2200,
+                knifeCooldown: 4000,
                 mesh: null,
                 aiStartDelay: 0,
                 aiCanAttack: false,
@@ -1785,25 +1785,55 @@ function showCreateRoom() {
     isReady = false;
     opponentReady = false;
     
+    document.getElementById('modeSelection').style.display = 'block';
+    document.getElementById('roomDetails').style.display = 'none';
+}
+function selectMultiplayerMode(mode) {
+    practiceMode = mode;
+    
+    document.getElementById('modeSelection').style.display = 'none';
+    document.getElementById('roomDetails').style.display = 'block';
+    
     roomCode = Math.random().toString(36).substr(2, 6).toUpperCase();
     document.getElementById('roomCode').textContent = roomCode;
+    
+    const playerSlots = document.getElementById('playerSlots');
+    const maxPlayers = mode === '1v1' ? 2 : 6;
+    playerSlots.innerHTML = '';
+    
+    for (let i = 1; i <= maxPlayers; i++) {
+        const slot = document.createElement('div');
+        slot.className = i === 1 ? 'player-slot occupied' : 'player-slot empty';
+        slot.id = `player${i}Slot`;
+        
+        if (i === 1) {
+            slot.innerHTML = `<h3>Player 1 (You)</h3><p id="player1Status">Not Ready</p>`;
+        } else {
+            slot.innerHTML = `<h3>Player ${i}</h3><p>Waiting...</p>`;
+        }
+        
+        playerSlots.appendChild(slot);
+    }
     
     if (!socket) {
         socket = io('http://localhost:3000');
     }
     
-    socket.emit('createRoom', { roomCode: roomCode });
+    socket.emit('createRoom', { roomCode: roomCode, gameMode: mode });
     
     socket.on('roomCreated', (data) => {
         myPlayerId = data.playerId;
-        console.log('Room created, playerId:', myPlayerId);
+        console.log('Room created, playerId:', myPlayerId, 'mode:', mode);
     });
     
     socket.on('playerJoined', (data) => {
         if (data.roomCode === roomCode) {
-            const player2Slot = document.getElementById('player2Slot');
-            player2Slot.className = 'player-slot occupied';
-            player2Slot.innerHTML = '<h3>Player 2</h3><p id="player2Status">Not Ready</p>';
+            const { playerId } = data;
+            const playerSlot = document.getElementById(`player${playerId}Slot`);
+            if (playerSlot) {
+                playerSlot.className = 'player-slot occupied';
+                playerSlot.innerHTML = `<h3>Player ${playerId}</h3><p id="player${playerId}Status">Not Ready</p>`;
+            }
             updateStartButtonState();
         }
     });
@@ -1811,11 +1841,11 @@ function showCreateRoom() {
     socket.on('playerReadyUpdate', (data) => {
         const { playerId, ready } = data;
         
-        if (playerId === 2) {
+        if (playerId !== myPlayerId) {
             opponentReady = ready;
-            const player2Status = document.getElementById('player2Status');
-            if (player2Status) {
-                player2Status.textContent = ready ? 'Ready to fight!' : 'Not Ready';
+            const playerStatus = document.getElementById(`player${playerId}Status`);
+            if (playerStatus) {
+                playerStatus.textContent = ready ? 'Ready to fight!' : 'Not Ready';
             }
         }
         
@@ -1826,15 +1856,12 @@ function showCreateRoom() {
         startMultiplayerGame();
     });
     
-    const player2Slot = document.getElementById('player2Slot');
-    player2Slot.className = 'player-slot empty';
-    player2Slot.innerHTML = '<h3>Player 2</h3><p>Waiting for opponent...</p>';
-    
     const startBtn = document.getElementById('startGameBtn');
     if (startBtn) {
         startBtn.style.display = 'none';
     }
 }
+
 
 function simulatePlayerJoin() {
     const player2Slot = document.getElementById('player2Slot');
@@ -1881,10 +1908,12 @@ function joinRoom() {
             roomCode = inputCode;
             isHost = false;
             myPlayerId = data.playerId;
+            practiceMode = data.gameMode;
             isReady = false;
             opponentReady = false;
             
-            statusDiv.innerHTML = '<p style="color: #4CAF50;">Successfully joined! Waiting for host to start...</p>';
+            const modeText = data.gameMode === '1v1' ? '1v1 (2 Players)' : '3v3 (6 Players)';
+            statusDiv.innerHTML = `<p style="color: #4CAF50;">Successfully joined ${modeText} room! Waiting for host to start...</p>`;
             
             const readyBtn = document.getElementById('readyBtnJoin');
             if (readyBtn) {
