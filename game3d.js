@@ -1816,13 +1816,8 @@ function selectMultiplayerMode(mode) {
     }
     
     if (!socket) {
-        const socketUrl = 'https://pudge-wars-game-tunnel-ry7t2n1i.devinapps.com';
-        socket = io(socketUrl, {
-            auth: {
-                username: 'user',
-                password: '146c347de3d1345c44415f309126435b'
-            }
-        });
+        const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
+        socket = io(socketUrl);
     }
     
     socket.emit('createRoom', { roomCode: roomCode, gameMode: mode });
@@ -1904,13 +1899,8 @@ function joinRoom() {
     statusDiv.innerHTML = '<p style="color: #4CAF50;">Connecting to room...</p>';
     
     if (!socket) {
-        const socketUrl = 'https://pudge-wars-game-tunnel-ry7t2n1i.devinapps.com';
-        socket = io(socketUrl, {
-            auth: {
-                username: 'user',
-                password: '146c347de3d1345c44415f309126435b'
-            }
-        });
+        const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
+        socket = io(socketUrl);
     }
     
     socket.emit('joinRoom', { roomCode: inputCode });
