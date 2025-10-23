@@ -261,7 +261,7 @@ class MundoKnifeGame3D {
 
     generateMissPattern() {
         const missIndices = [];
-        while (missIndices.length < 2) {
+        while (missIndices.length < 3) {
             const randomIndex = Math.floor(Math.random() * 7);
             if (!missIndices.includes(randomIndex)) {
                 missIndices.push(randomIndex);
@@ -379,7 +379,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 4000,
+                knifeCooldown: 5000,
                 mesh: null,
                 canAttack: index === 0,
                 isThrowingKnife: false,
@@ -418,7 +418,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 4000,
+                knifeCooldown: 5000,
                 mesh: null,
                 aiStartDelay: 0,
                 aiCanAttack: false,
