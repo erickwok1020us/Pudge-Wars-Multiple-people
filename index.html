@@ -299,8 +299,9 @@
             height: 100%;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
+            padding-top: 389px;
             z-index: 300;
             cursor: default;
             overflow: hidden;
@@ -346,6 +347,7 @@
         .game-title-image {
             width: clamp(300px, 50vw, 600px);
             height: auto;
+            margin-top: 60px;
             margin-bottom: 50px;
             position: relative;
             z-index: 1;
@@ -359,8 +361,8 @@
         }
 
         .room-content .game-title-image {
-            width: clamp(250px, 45vw, 500px);
-            margin-bottom: 30px;
+            width: clamp(300px, 50vw, 600px);
+            margin-bottom: 50px;
         }
 
         .menu-buttons {
@@ -374,7 +376,7 @@
 
         .menu-btn {
             font-family: 'Cinzel', serif;
-            padding: 15px 40px;
+            padding: 8px 15px;
             font-size: 18px;
             font-weight: 600;
             background: var(--card-bg);
@@ -384,7 +386,6 @@
             cursor: pointer;
             transition: var(--transition);
             backdrop-filter: blur(10px);
-            min-width: 200px;
             text-align: center;
             letter-spacing: 1px;
         }
@@ -404,42 +405,45 @@
             background: #000;
             display: none;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
+            padding-top: 389px;
             z-index: 300;
+            overflow-y: auto;
         }
 
         .room-content {
             background: var(--card-bg);
-            padding: 40px 40px 60px 40px;
+            padding: 10px 10px 15px 10px;
             border-radius: var(--border-radius);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
             text-align: center;
-            max-width: 800px;
-            width: 90%;
+            max-width: 450px;
+            width: 50%;
             position: relative;
         }
 
         .room-code {
-            font-size: 2rem;
+            font-size: 1rem;
             color: #4CAF50;
-            margin: 20px 0;
-            padding: 15px;
+            margin: 5px 0;
+            padding: 3px 5px;
             background: rgba(76, 175, 80, 0.1);
             border-radius: var(--border-radius);
-            border: 2px solid #4CAF50;
+            border: 1px solid #4CAF50;
+            display: inline-block;
         }
 
         .room-input {
-            padding: 15px;
-            font-size: 18px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 3px 5px;
+            font-size: 9px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: var(--border-radius);
             background: var(--card-bg);
             color: var(--text-primary);
-            margin: 20px 0;
-            width: 100%;
+            margin: 5px 0;
+            width: 90%;
             text-align: center;
         }
 
@@ -450,15 +454,15 @@
 
         .player-slots {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin: 10px 0;
         }
 
         .player-slot {
             flex: 1;
-            padding: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 5px 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: var(--border-radius);
             background: var(--card-bg);
         }
@@ -476,8 +480,8 @@
 
         .back-btn {
             position: absolute;
-            bottom: 15px;
-            right: 15px;
+            bottom: 10px;
+            right: 10px;
             padding: 10px 20px;
             background: var(--card-bg);
             border: 1px solid rgba(255, 255, 255, 0.3);
@@ -664,20 +668,20 @@
             <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <div class="main-menu-overlay"></div>
+        <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
         <div class="room-content">
-            <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
-            <h2 style="font-size: 2rem;">Select Game Mode</h2>
-            <p style="font-size: 2rem;">Choose your battle mode:</p>
-            <div class="menu-buttons" style="margin-top: 40px;">
-                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('1v1')" style="font-size: 2.6rem; padding: 20px 40px;">
+            <h2 style="font-size: 1rem;">Select Game Mode</h2>
+            <p style="font-size: 1rem;">Choose your battle mode:</p>
+            <div class="menu-buttons" style="margin-top: 20px;">
+                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('1v1')" style="font-size: 1.3rem; padding: 10px 20px;">
                     1v1
                     <br>
-                    <span style="font-size: 1.6rem; opacity: 0.8;">You vs 1 AI</span>
+                    <span style="font-size: 0.8rem; opacity: 0.8;">You vs 1 AI</span>
                 </button>
-                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('3v3')" style="font-size: 2.6rem; padding: 20px 40px;">
+                <button class="menu-btn" onclick="playButtonClickSound(); startPractice('3v3')" style="font-size: 1.3rem; padding: 10px 20px;">
                     3v3
                     <br>
-                    <span style="font-size: 1.6rem; opacity: 0.8;">You + 2 AI vs 3 AI</span>
+                    <span style="font-size: 0.8rem; opacity: 0.8;">You + 2 AI vs 3 AI</span>
                 </button>
             </div>
             <button class="back-btn" onclick="showMainMenu()">← Back</button>
@@ -689,21 +693,21 @@
             <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <div class="main-menu-overlay"></div>
+        <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
         <div class="room-content">
-            <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
             <div id="modeSelection" style="display: block;">
-                <h2 style="font-size: 2rem;">Select Game Mode</h2>
-                <p style="font-size: 2rem;">Choose your battle mode:</p>
-                <div class="menu-buttons" style="margin-top: 40px;">
-                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('1v1')" style="font-size: 2.6rem; padding: 20px 40px;">
+                <h2 style="font-size: 1rem;">Select Game Mode</h2>
+                <p style="font-size: 1rem;">Choose your battle mode:</p>
+                <div class="menu-buttons" style="margin-top: 20px;">
+                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('1v1')" style="font-size: 1.3rem; padding: 10px 20px; min-width: 240px;">
                         1v1
                         <br>
-                        <span style="font-size: 1.6rem; opacity: 0.8;">2 Players</span>
+                        <span style="font-size: 0.8rem; opacity: 0.8;">2 Players</span>
                     </button>
-                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('3v3')" style="font-size: 2.6rem; padding: 20px 40px;">
+                    <button class="menu-btn" onclick="playButtonClickSound(); selectMultiplayerMode('3v3')" style="font-size: 1.3rem; padding: 10px 20px; min-width: 240px;">
                         3v3
                         <br>
-                        <span style="font-size: 1.6rem; opacity: 0.8;">6 Players (3 vs 3)</span>
+                        <span style="font-size: 0.8rem; opacity: 0.8;">6 Players (3 vs 3)</span>
                     </button>
                 </div>
             </div>
@@ -727,8 +731,8 @@
             <source src="vidu-video-3002726427097011.mp4" type="video/mp4">
         </video>
         <div class="main-menu-overlay"></div>
+        <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
         <div class="room-content">
-            <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
             <h2>Join Room</h2>
             <p>Enter the room code to join a game:</p>
             <input type="text" class="room-input" id="roomCodeInput" placeholder="Enter room code..." maxlength="6">
@@ -930,6 +934,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=323"></script>
+    <script src="game3d.js?v=338"></script>
 </body>
 </html>
