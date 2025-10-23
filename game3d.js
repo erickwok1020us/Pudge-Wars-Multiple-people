@@ -1801,6 +1801,12 @@ function selectMultiplayerMode(mode) {
     const maxPlayers = mode === '1v1' ? 2 : 6;
     playerSlots.innerHTML = '';
     
+    if (mode === '3v3') {
+        playerSlots.classList.add('mode-3v3');
+    } else {
+        playerSlots.classList.remove('mode-3v3');
+    }
+    
     for (let i = 1; i <= maxPlayers; i++) {
         const slot = document.createElement('div');
         slot.className = i === 1 ? 'player-slot occupied' : 'player-slot empty';

@@ -488,9 +488,16 @@
 
         .player-slots {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 5px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
             margin: 10px 0;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .player-slots.mode-3v3 {
+            grid-template-columns: repeat(3, 1fr);
         }
 
         .player-slot {
@@ -751,9 +758,9 @@
                 <div class="room-code" id="roomCode">Loading...</div>
                 <div class="player-slots" id="playerSlots">
                 </div>
-                <div class="ready-start-buttons" style="display: flex; gap: 20px; justify-content: center; margin-top: 30px;">
-                    <button class="menu-btn" id="readyBtn" onclick="toggleReady()">Ready</button>
-                    <button class="menu-btn" id="startGameBtn" onclick="startMultiplayerGame()" style="display: none; opacity: 0.3;" disabled>Start Game</button>
+                <div class="ready-start-buttons" style="display: flex; gap: 20px; justify-content: center; margin-top: 20px; margin-bottom: 20px;">
+                    <button class="menu-btn" id="readyBtn" onclick="toggleReady()" style="min-width: 150px;">Ready</button>
+                    <button class="menu-btn" id="startGameBtn" onclick="startMultiplayerGame()" style="display: none; opacity: 0.3; min-width: 150px;" disabled>Start Game</button>
                 </div>
             </div>
             <button class="back-btn" onclick="showMainMenu()">← Back</button>
@@ -968,6 +975,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=348"></script>
+    <script src="game3d.js?v=350"></script>
 </body>
 </html>
