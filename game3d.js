@@ -320,27 +320,22 @@ class MundoKnifeGame3D {
         const characterRadius = 6;
         
         if (Math.abs(x) < 18) {
-            console.log('🚫 [BOUNDS] Blocked by river zone');
             return false;
         }
         
         if (player.team === 1 && x > -18) {
-            console.log('🚫 [BOUNDS] Team1 blocked from crossing to right side');
             return false;
         }
         if (player.team === 2 && x < 18) {
-            console.log('🚫 [BOUNDS] Team2 blocked from crossing to left side');
             return false;
         }
         
         if (Math.abs(x) > 80 - characterRadius || Math.abs(z) > 68) {
-            console.log('🚫 [BOUNDS] Blocked by rectangular bounds');
             return false;
         }
         
         const cornerDistance = Math.abs(x) + Math.abs(z);
         if (cornerDistance > 120) {
-            console.log('🚫 [BOUNDS] Blocked by octagonal corner');
             return false;
         }
         
@@ -689,10 +684,6 @@ class MundoKnifeGame3D {
     }
 
     setupEventListeners() {
-        console.log('🔧 [SETUP] setupEventListeners called');
-        console.log('🔧 [SETUP] renderer:', this.renderer);
-        console.log('🔧 [SETUP] renderer.domElement:', this.renderer.domElement);
-        
         this.eventListeners.documentContextMenu = (e) => {
             if (e.target !== this.renderer.domElement) {
                 e.preventDefault();
@@ -702,14 +693,11 @@ class MundoKnifeGame3D {
         document.addEventListener('contextmenu', this.eventListeners.documentContextMenu, true);
         
         this.eventListeners.canvasContextMenu = (e) => {
-            console.log('🔥 [EVENT] contextmenu event fired!', e);
             e.preventDefault();
             e.stopPropagation();
             this.handlePlayerMovement(e);
         };
         this.renderer.domElement.addEventListener('contextmenu', this.eventListeners.canvasContextMenu, true);
-        
-        console.log('🔧 [SETUP] contextmenu listener attached to canvas and document');
         
         this.eventListeners.keydown = (e) => {
             this.keys[e.key.toLowerCase()] = true;
@@ -760,7 +748,6 @@ class MundoKnifeGame3D {
 
     handlePlayerMovement(event) {
         if (this.player1.health <= 0) {
-            console.log(`☠️ [MOVEMENT] Player is dead, cannot move`);
             return;
         }
         
@@ -770,38 +757,11 @@ class MundoKnifeGame3D {
         this.mouse.x = mouseX;
         this.mouse.y = mouseY;
         
-        console.log(`🖱️ [MOUSE] Screen(${event.clientX}, ${event.clientY}) → NDC(${this.mouse.x.toFixed(3)}, ${this.mouse.y.toFixed(3)})`);
-        console.log(`📷 [CAMERA] position: x=${this.camera.position.x.toFixed(2)}, y=${this.camera.position.y.toFixed(2)}, z=${this.camera.position.z.toFixed(2)}`);
-        console.log(`📷 [CAMERA] rotation: x=${this.camera.rotation.x.toFixed(2)}, y=${this.camera.rotation.y.toFixed(2)}, z=${this.camera.rotation.z.toFixed(2)}`);
-        
-        console.log(`🔍 [RAYCAST] invisibleGround exists:`, !!this.invisibleGround);
-        if (this.invisibleGround) {
-            console.log(`🔍 [RAYCAST] invisibleGround.visible:`, this.invisibleGround.visible);
-            console.log(`🔍 [RAYCAST] invisibleGround.position: x=${this.invisibleGround.position.x.toFixed(2)}, y=${this.invisibleGround.position.y.toFixed(2)}, z=${this.invisibleGround.position.z.toFixed(2)}`);
-            console.log(`🔍 [RAYCAST] invisibleGround.rotation: x=${this.invisibleGround.rotation.x.toFixed(2)}, y=${this.invisibleGround.rotation.y.toFixed(2)}, z=${this.invisibleGround.rotation.z.toFixed(2)}`);
-            console.log(`🔍 [RAYCAST] invisibleGround.scale: x=${this.invisibleGround.scale.x.toFixed(2)}, y=${this.invisibleGround.scale.y.toFixed(2)}, z=${this.invisibleGround.scale.z.toFixed(2)}`);
-            console.log(`🔍 [RAYCAST] invisibleGround.geometry.type:`, this.invisibleGround.geometry.type);
-            if (this.invisibleGround.geometry.parameters) {
-                console.log(`🔍 [RAYCAST] invisibleGround.geometry size: width=${this.invisibleGround.geometry.parameters.width}, height=${this.invisibleGround.geometry.parameters.height}`);
-            }
-            console.log(`🔍 [RAYCAST] invisibleGround.material.side:`, this.invisibleGround.material.side, '(0=Front, 1=Back, 2=Double)');
-        }
-        
         this.raycaster.setFromCamera(this.mouse, this.camera);
-        console.log(`🔍 [RAYCAST] ray.origin: x=${this.raycaster.ray.origin.x.toFixed(2)}, y=${this.raycaster.ray.origin.y.toFixed(2)}, z=${this.raycaster.ray.origin.z.toFixed(2)}`);
-        console.log(`🔍 [RAYCAST] ray.direction: x=${this.raycaster.ray.direction.x.toFixed(3)}, y=${this.raycaster.ray.direction.y.toFixed(3)}, z=${this.raycaster.ray.direction.z.toFixed(3)}`);
-        
         const intersects = this.raycaster.intersectObject(this.invisibleGround);
-        
-        console.log(`🔍 [RAYCAST] intersects.length:`, intersects.length);
-        if (intersects.length > 0) {
-            console.log(`🔍 [RAYCAST] First intersection point:`, intersects[0].point);
-        }
         
         if (intersects.length > 0) {
             const point = intersects[0].point;
-            
-            console.log(`🎯 [CLICK] Screen(${event.clientX}, ${event.clientY}) → World(x=${point.x.toFixed(1)}, z=${point.z.toFixed(1)})`);
             
             const boundsCheck = this.isWithinMapBounds(point.x, point.z, this.player1);
             
@@ -820,14 +780,11 @@ class MundoKnifeGame3D {
                     targetZ: point.z
                 });
             }
-        } else {
-            console.log(`❌ [RAYCAST] No intersection with invisibleGround!`);
         }
     }
 
     throwKnifeTowardsMouse() {
         if (this.player1.health <= 0) {
-            console.log(`☠️ [ATTACK] Player is dead, cannot throw knife`);
             return;
         }
         
