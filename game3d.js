@@ -1461,8 +1461,8 @@ class MundoKnifeGame3D {
                 [...this.team1, ...this.team2].forEach(player => {
                     if (!player.isAI) return;
                     
-                    const potentialX = player.x + (Math.random() - 0.5) * 150;
-                    const potentialZ = player.z + (Math.random() - 0.5) * 150;
+                    const potentialX = player.x + (Math.random() - 0.5) * 60;
+                    const potentialZ = player.z + (Math.random() - 0.5) * 60;
                     
                     if (this.isWithinMapBounds(potentialX, potentialZ, player)) {
                         player.targetX = potentialX;
