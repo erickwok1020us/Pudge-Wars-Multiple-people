@@ -12,6 +12,11 @@ class MundoKnifeGame3D {
         this.currentState = null;
         this.previousState = null;
         
+        this.fpsData = {
+            frames: [],
+            lastUpdateTime: performance.now()
+        };
+        
         this.eventListeners = {
             documentContextMenu: null,
             canvasContextMenu: null,
@@ -622,7 +627,14 @@ class MundoKnifeGame3D {
             }
             
             if (newAnimation) {
-                newAnimation.reset().fadeIn(0.2).play();
+                newAnimation.reset().fadeIn(0.2);
+                
+                if (desiredState === 'death') {
+                    newAnimation.setLoop(THREE.LoopOnce);
+                    newAnimation.clampWhenFinished = true;
+                }
+                
+                newAnimation.play();
                 player.currentAnimation = newAnimation;
             }
             
@@ -1105,6 +1117,11 @@ class MundoKnifeGame3D {
     }
 
     updatePlayerMovement(player, dt) {
+        if (player.health <= 0) {
+            player.isMoving = false;
+            return;
+        }
+        
         if (player.isMoving && player.targetX !== null && player.targetZ !== null) {
             const dx = player.targetX - player.x;
             const dz = player.targetZ - player.z;
@@ -1501,13 +1518,33 @@ class MundoKnifeGame3D {
         let frameTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
         
+        this.fpsData.frames.push(currentTime);
+        this.fpsData.frames = this.fpsData.frames.filter(time => currentTime - time < 1000);
+        
+        if (currentTime - this.fpsData.lastUpdateTime > 200) {
+            const fps = this.fpsData.frames.length;
+            const fpsElement = document.getElementById('fpsValue');
+            if (fpsElement) {
+                fpsElement.textContent = fps;
+                fpsElement.className = '';
+                if (fps < 30) {
+                    fpsElement.classList.add('fps-low');
+                } else if (fps < 50) {
+                    fpsElement.classList.add('fps-medium');
+                }
+            }
+            this.fpsData.lastUpdateTime = currentTime;
+        }
+        
         if (frameTime > 0.25) frameTime = 0.25;
         
         this.accumulator += frameTime;
         
         while (this.accumulator >= this.fixedDt) {
             if (this.gameState.isRunning || this.gameState.countdownActive) {
-                this.previousState = this.cloneGameState();
+                if (this.isMultiplayer) {
+                    this.previousState = this.cloneGameState();
+                }
                 this.updatePlayers(this.fixedDt);
                 this.updateCamera();
                 if (this.gameState.isRunning) {
@@ -1515,7 +1552,9 @@ class MundoKnifeGame3D {
                     this.updateKnives(this.fixedDt);
                     this.updateParticles();
                 }
-                this.currentState = this.cloneGameState();
+                if (this.isMultiplayer) {
+                    this.currentState = this.cloneGameState();
+                }
             }
             this.accumulator -= this.fixedDt;
         }
@@ -1526,9 +1565,22 @@ class MundoKnifeGame3D {
             }
         });
         
-        if ((this.gameState.isRunning || this.gameState.countdownActive) && this.previousState && this.currentState) {
-            const alpha = this.accumulator / this.fixedDt;
-            this.interpolateStates(alpha);
+        if (this.gameState.isRunning || this.gameState.countdownActive) {
+            if (this.isMultiplayer && this.previousState && this.currentState) {
+                const alpha = this.accumulator / this.fixedDt;
+                this.interpolateStates(alpha);
+            } else if (!this.isMultiplayer) {
+                [...this.team1, ...this.team2].forEach(player => {
+                    if (player && player.mesh) {
+                        player.mesh.position.x = player.x;
+                        player.mesh.position.z = player.z;
+                        player.mesh.rotation.y = player.rotation;
+                    }
+                });
+                
+                this.knives.forEach(knife => {
+                });
+            }
         }
         
         this.updateCooldownDisplay();

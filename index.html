@@ -98,6 +98,39 @@
             color: #ffa726 !important;
         }
 
+        .fps-display {
+            position: absolute;
+            top: 160px;
+            left: 20px;
+            background: var(--card-bg);
+            padding: 8px 12px;
+            border-radius: var(--border-radius);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 14px;
+            color: var(--text-primary);
+            z-index: 200;
+        }
+
+        .fps-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #fpsValue {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .fps-low {
+            color: #ff6b6b !important;
+        }
+
+        .fps-medium {
+            color: #ffa726 !important;
+        }
+
         .ui-overlay {
             position: absolute;
             top: 20px;
@@ -846,6 +879,12 @@
         <div class="latency-display">
             <div class="latency-indicator">
                 <span>Ping: <span id="latencyValue">--</span>ms</span>
+            </div>
+        </div>
+
+        <div class="fps-display">
+            <div class="fps-indicator">
+                <span>FPS: <span id="fpsValue">--</span></span>
             </div>
         </div>
 
