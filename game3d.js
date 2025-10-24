@@ -936,8 +936,15 @@ class MundoKnifeGame3D {
         knifeGroup.position.set(fromPlayer.x, playerY + spawnHeight, fromPlayer.z);
         knifeGroup.castShadow = true;
         
-        const dx = targetX - fromPlayer.x;
-        const dz = targetZ - fromPlayer.z;
+        let dx = targetX - fromPlayer.x;
+        let dz = targetZ - fromPlayer.z;
+        
+        if (fromPlayer.isAI) {
+            const inaccuracy = 0.40;
+            dx += (Math.random() - 0.5) * inaccuracy * Math.sqrt(dx * dx + dz * dz);
+            dz += (Math.random() - 0.5) * inaccuracy * Math.sqrt(dx * dx + dz * dz);
+        }
+        
         const distanceXZ = Math.sqrt(dx * dx + dz * dz);
         
         const directionXZ = {
