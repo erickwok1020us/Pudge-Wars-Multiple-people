@@ -317,6 +317,8 @@ class MundoKnifeGame3D {
     }
 
     isWithinMapBounds(x, z, player) {
+        const characterRadius = 6;
+        
         if (Math.abs(x) < 18) {
             console.log('🚫 [BOUNDS] Blocked by river zone');
             return false;
@@ -331,7 +333,7 @@ class MundoKnifeGame3D {
             return false;
         }
         
-        if (Math.abs(x) > 80 || Math.abs(z) > 68) {
+        if (Math.abs(x) > 80 - characterRadius || Math.abs(z) > 68) {
             console.log('🚫 [BOUNDS] Blocked by rectangular bounds');
             return false;
         }
@@ -1057,8 +1059,8 @@ class MundoKnifeGame3D {
             toPlayer.z - fromPlayer.z
         ).normalize();
         
-        if (fromPlayer === this.player2) {
-            const inaccuracy = 0.26;
+        if (fromPlayer.isAI) {
+            const inaccuracy = 0.40;
             direction.x += (Math.random() - 0.5) * inaccuracy;
             direction.z += (Math.random() - 0.5) * inaccuracy;
             direction.normalize();
@@ -1091,7 +1093,7 @@ class MundoKnifeGame3D {
             [...this.team1, ...this.team2].forEach(player => {
                 if (!player.isAI || player.health <= 0 || player.isThrowingKnife) return;
                 
-                if (Math.random() < 0.06) {
+                if (Math.random() < 0.10) {
                     const potentialX = player.x + (Math.random() - 0.5) * 30;
                     const potentialZ = player.z + (Math.random() - 0.5) * 30;
                     
@@ -1454,6 +1456,23 @@ class MundoKnifeGame3D {
         let count = 5;
         countdownNumber.textContent = count;
         
+        const aiMovementInterval = setInterval(() => {
+            if (!this.isMultiplayer) {
+                [...this.team1, ...this.team2].forEach(player => {
+                    if (!player.isAI) return;
+                    
+                    const potentialX = player.x + (Math.random() - 0.5) * 150;
+                    const potentialZ = player.z + (Math.random() - 0.5) * 150;
+                    
+                    if (this.isWithinMapBounds(potentialX, potentialZ, player)) {
+                        player.targetX = potentialX;
+                        player.targetZ = potentialZ;
+                        player.isMoving = true;
+                    }
+                });
+            }
+        }, 300);
+        
         const countdownInterval = setInterval(() => {
             count--;
             if (count > 0) {
@@ -1484,6 +1503,7 @@ class MundoKnifeGame3D {
                     this.player2.aiCanAttack = true;
                 }, 500);
                 clearInterval(countdownInterval);
+                clearInterval(aiMovementInterval);
             }
         }, 1000);
     }
