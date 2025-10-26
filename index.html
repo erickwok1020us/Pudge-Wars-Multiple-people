@@ -1,17 +1,16 @@
 <!DOCTYPE html>
 <!--
     Mundo Cleaver - Main HTML File
-    Version: v356
+    Version: v358
     Last Updated: 2025-10-26
     
-    Changes in v356:
-    - **PERFORMANCE OPTIMIZATIONS**:
-      1. Fixed FPS calculation (was showing 0, now correctly calculates from frameTime)
-      2. Optimized Health Bar updates (reduced from 60fps to 10fps with 100ms throttle)
-      3. Optimized Cooldown display updates (reduced from 60fps to 20fps with 50ms throttle)
-    - These optimizations significantly reduce DOM manipulation overhead
-    - FPS tracking now uses safe division check: frameTime > 0 ? Math.round(1 / frameTime) : 0
-    - Updated game3d.js to v356
+    Changes in v358:
+    - **CRITICAL FPS FIX**: Fixed background video not being paused when game starts
+    - Root cause: Main menu video continued playing in background, consuming CPU
+    - Added video pause/hide logic to startGame() function
+    - Added lightweight FPS tracking (updates every 500ms, minimal performance impact)
+    - FPS should now be restored to 200+ (from 50)
+    - Updated game3d.js to v358
     
     Previous changes (v355):
     - **CRITICAL FPS FIX**: Optimized FPS tracking to restore 170 FPS performance
@@ -1028,6 +1027,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=356"></script>
+    <script src="game3d.js?v=358"></script>
 </body>
 </html>

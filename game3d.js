@@ -12,16 +12,6 @@ class MundoKnifeGame3D {
         this.currentState = null;
         this.previousState = null;
         
-        this.fpsData = {
-            lastUpdateTime: performance.now(),
-            frameCount: 0,
-            lastFrameCountTime: performance.now()
-        };
-        
-        this.uiUpdateData = {
-            lastHealthBarUpdate: 0,
-            lastCooldownUpdate: 0
-        };
         
         this.eventListeners = {
             documentContextMenu: null,
@@ -36,6 +26,11 @@ class MundoKnifeGame3D {
             total: 4,
             loaded: 0,
             currentAsset: ''
+        };
+        
+        this.fpsData = {
+            frames: 0,
+            lastFpsUpdate: performance.now()
         };
         
         this.showLoadingOverlay();
@@ -1429,6 +1424,19 @@ class MundoKnifeGame3D {
         
         countdownOverlay.style.display = 'flex';
         
+        const mainMenuVideo = document.querySelector('.main-menu-video');
+        if (mainMenuVideo) {
+            mainMenuVideo.pause();
+            mainMenuVideo.currentTime = 0;
+            mainMenuVideo.style.display = 'none';
+        }
+        const loadingVideo = document.querySelector('#loadingOverlay video');
+        if (loadingVideo) {
+            loadingVideo.pause();
+            loadingVideo.currentTime = 0;
+            loadingVideo.style.display = 'none';
+        }
+        
         this.player1.knifeCooldown = 5000;
         this.player2.knifeCooldown = 5000;
         this.player1.lastKnifeTime = Date.now();
@@ -1462,17 +1470,6 @@ class MundoKnifeGame3D {
                 if (count === 2) {
                     if (typeof pauseMainMenuAudio === 'function') {
                         pauseMainMenuAudio();
-                    }
-                    const mainMenuVideo = document.querySelector('.main-menu-video');
-                    if (mainMenuVideo) {
-                        mainMenuVideo.pause();
-                        mainMenuVideo.currentTime = 0;
-                        mainMenuVideo.style.display = 'none';
-                    }
-                    const loadingVideo = document.querySelector('#loadingOverlay video');
-                    if (loadingVideo) {
-                        loadingVideo.pause();
-                        loadingVideo.currentTime = 0;
                     }
                     const readyFightSound = document.getElementById('readyFightSound');
                     if (readyFightSound) {
@@ -1530,26 +1527,6 @@ class MundoKnifeGame3D {
         let frameTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
         
-        this.fpsData.frameCount++;
-        
-        if (currentTime - this.fpsData.lastUpdateTime > 200) {
-            const timeDiff = (currentTime - this.fpsData.lastFrameCountTime) / 1000;
-            const fps = timeDiff > 0 ? Math.round(this.fpsData.frameCount / timeDiff) : 0;
-            const fpsElement = document.getElementById('fpsValue');
-            if (fpsElement) {
-                fpsElement.textContent = fps;
-                fpsElement.className = '';
-                if (fps < 30) {
-                    fpsElement.classList.add('fps-low');
-                } else if (fps < 50) {
-                    fpsElement.classList.add('fps-medium');
-                }
-            }
-            this.fpsData.lastUpdateTime = currentTime;
-            this.fpsData.lastFrameCountTime = currentTime;
-            this.fpsData.frameCount = 0;
-        }
-        
         if (frameTime > 0.25) frameTime = 0.25;
         
         this.accumulator += frameTime;
@@ -1597,17 +1574,21 @@ class MundoKnifeGame3D {
             }
         }
         
-        if (currentTime - this.uiUpdateData.lastCooldownUpdate > 50) {
-            this.updateCooldownDisplay();
-            this.uiUpdateData.lastCooldownUpdate = currentTime;
-        }
-        
-        if (currentTime - this.uiUpdateData.lastHealthBarUpdate > 100) {
-            this.updateHealthDisplay();
-            this.uiUpdateData.lastHealthBarUpdate = currentTime;
-        }
-        
+        this.updateCooldownDisplay();
+        this.updateHealthDisplay();
         this.renderer.render(this.scene, this.camera);
+        
+        this.fpsData.frames++;
+        if (currentTime - this.fpsData.lastFpsUpdate >= 500) {
+            const elapsed = currentTime - this.fpsData.lastFpsUpdate;
+            const fps = Math.round((this.fpsData.frames * 1000) / elapsed);
+            const fpsElement = document.getElementById('fpsValue');
+            if (fpsElement) {
+                fpsElement.textContent = fps;
+            }
+            this.fpsData.frames = 0;
+            this.fpsData.lastFpsUpdate = currentTime;
+        }
         
         this.gameLoopId = requestAnimationFrame(() => this.gameLoop());
     }
@@ -2086,6 +2067,13 @@ function startGame(isMultiplayer = false) {
     document.getElementById('createRoomInterface').style.display = 'none';
     document.getElementById('joinRoomInterface').style.display = 'none';
     document.getElementById('gameContainer').style.display = 'block';
+    
+    const mainMenuVideo = document.querySelector('.main-menu-video');
+    if (mainMenuVideo) {
+        mainMenuVideo.pause();
+        mainMenuVideo.currentTime = 0;
+        mainMenuVideo.style.display = 'none';
+    }
     
     currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost, practiceMode);
 }
