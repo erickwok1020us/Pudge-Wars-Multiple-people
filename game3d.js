@@ -1392,8 +1392,10 @@ class MundoKnifeGame3D {
     }
 
     updateKillCountDisplay() {
-        document.getElementById('player1Kills').textContent = this.killCounts.player1;
-        document.getElementById('player2Kills').textContent = this.killCounts.player2;
+        const player1Kills = document.getElementById('player1Kills');
+        const player2Kills = document.getElementById('player2Kills');
+        if (player1Kills) player1Kills.textContent = this.killCounts.player1;
+        if (player2Kills) player2Kills.textContent = this.killCounts.player2;
     }
 
     updateCooldownDisplay() {
