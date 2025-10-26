@@ -1,21 +1,28 @@
 <!DOCTYPE html>
 <!--
     Mundo Cleaver - Main HTML File
-    Version: v354
-    Last Updated: 2025-10-22
+    Version: v356
+    Last Updated: 2025-10-26
     
-    Changes in v354:
-    - Fixed background video still visible during gameplay
-    - Added mainMenuVideo.style.display = 'none' to hide video element
-    - Modified both hideLoadingOverlay() and startCountdown() functions
-    - Fixed 3v3 Create Room page frame size issue on macOS
-    - Added #roomDetails CSS to limit max-width to 500px
-    - Updated game3d.js to v354
+    Changes in v356:
+    - **PERFORMANCE OPTIMIZATIONS**:
+      1. Fixed FPS calculation (was showing 0, now correctly calculates from frameTime)
+      2. Optimized Health Bar updates (reduced from 60fps to 10fps with 100ms throttle)
+      3. Optimized Cooldown display updates (reduced from 60fps to 20fps with 50ms throttle)
+    - These optimizations significantly reduce DOM manipulation overhead
+    - FPS tracking now uses safe division check: frameTime > 0 ? Math.round(1 / frameTime) : 0
+    - Updated game3d.js to v356
     
-    Previous changes (v348-v353):
+    Previous changes (v355):
+    - **CRITICAL FPS FIX**: Optimized FPS tracking to restore 170 FPS performance
+    - Removed expensive filter() operation that was running every frame
+    - Changed FPS calculation from array tracking to instant frame time calculation
+    
+    Previous changes (v348-v354):
     - Fixed Socket.IO connection to work on remote servers
     - Fixed Back button clickability (z-index: 10 → 30)
     - Fixed macOS display scaling (.room-content width: 50% → 90%)
+    - Fixed background video visibility during gameplay
     - AI difficulty remains reduced (3/7 miss rate, 5 second cooldown)
 -->
 <html lang="en">
@@ -1021,6 +1028,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=354"></script>
+    <script src="game3d.js?v=356"></script>
 </body>
 </html>

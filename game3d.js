@@ -13,8 +13,14 @@ class MundoKnifeGame3D {
         this.previousState = null;
         
         this.fpsData = {
-            frames: [],
-            lastUpdateTime: performance.now()
+            lastUpdateTime: performance.now(),
+            frameCount: 0,
+            lastFrameCountTime: performance.now()
+        };
+        
+        this.uiUpdateData = {
+            lastHealthBarUpdate: 0,
+            lastCooldownUpdate: 0
         };
         
         this.eventListeners = {
@@ -1524,11 +1530,11 @@ class MundoKnifeGame3D {
         let frameTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
         
-        this.fpsData.frames.push(currentTime);
-        this.fpsData.frames = this.fpsData.frames.filter(time => currentTime - time < 1000);
+        this.fpsData.frameCount++;
         
         if (currentTime - this.fpsData.lastUpdateTime > 200) {
-            const fps = this.fpsData.frames.length;
+            const timeDiff = (currentTime - this.fpsData.lastFrameCountTime) / 1000;
+            const fps = timeDiff > 0 ? Math.round(this.fpsData.frameCount / timeDiff) : 0;
             const fpsElement = document.getElementById('fpsValue');
             if (fpsElement) {
                 fpsElement.textContent = fps;
@@ -1540,6 +1546,8 @@ class MundoKnifeGame3D {
                 }
             }
             this.fpsData.lastUpdateTime = currentTime;
+            this.fpsData.lastFrameCountTime = currentTime;
+            this.fpsData.frameCount = 0;
         }
         
         if (frameTime > 0.25) frameTime = 0.25;
@@ -1589,8 +1597,16 @@ class MundoKnifeGame3D {
             }
         }
         
-        this.updateCooldownDisplay();
-        this.updateHealthDisplay();
+        if (currentTime - this.uiUpdateData.lastCooldownUpdate > 50) {
+            this.updateCooldownDisplay();
+            this.uiUpdateData.lastCooldownUpdate = currentTime;
+        }
+        
+        if (currentTime - this.uiUpdateData.lastHealthBarUpdate > 100) {
+            this.updateHealthDisplay();
+            this.uiUpdateData.lastHealthBarUpdate = currentTime;
+        }
+        
         this.renderer.render(this.scene, this.camera);
         
         this.gameLoopId = requestAnimationFrame(() => this.gameLoop());
