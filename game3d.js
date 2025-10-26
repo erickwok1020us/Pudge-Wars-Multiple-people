@@ -81,6 +81,16 @@ class MundoKnifeGame3D {
         if (overlay) {
             overlay.style.display = 'none';
         }
+        const loadingVideo = document.querySelector('#loadingOverlay video');
+        if (loadingVideo) {
+            loadingVideo.pause();
+            loadingVideo.currentTime = 0;
+        }
+        const mainMenuVideo = document.querySelector('.main-menu-video');
+        if (mainMenuVideo) {
+            mainMenuVideo.pause();
+            mainMenuVideo.currentTime = 0;
+        }
     }
 
     updateLoadingProgress(assetName) {
