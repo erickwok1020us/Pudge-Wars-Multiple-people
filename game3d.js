@@ -1354,7 +1354,16 @@ class MundoKnifeGame3D {
             if (!player.healthBarElement || !player.mesh) return;
             
             const healthBar = player.healthBarElement;
+            
+            if (player.health <= 0) {
+                healthBar.style.opacity = '0';
+                healthBar.style.pointerEvents = 'none';
+                return;
+            }
+            
             healthBar.style.display = 'flex';
+            healthBar.style.opacity = '1';
+            healthBar.style.pointerEvents = 'auto';
             
             const segments = healthBar.children;
             for (let i = 0; i < 5; i++) {
