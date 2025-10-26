@@ -90,6 +90,7 @@ class MundoKnifeGame3D {
         if (mainMenuVideo) {
             mainMenuVideo.pause();
             mainMenuVideo.currentTime = 0;
+            mainMenuVideo.style.display = 'none';
         }
     }
 
@@ -1460,6 +1461,7 @@ class MundoKnifeGame3D {
                     if (mainMenuVideo) {
                         mainMenuVideo.pause();
                         mainMenuVideo.currentTime = 0;
+                        mainMenuVideo.style.display = 'none';
                     }
                     const loadingVideo = document.querySelector('#loadingOverlay video');
                     if (loadingVideo) {
