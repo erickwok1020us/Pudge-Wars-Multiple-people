@@ -85,12 +85,10 @@ class MundoKnifeGame3D {
         const loadingVideo = document.querySelector('#loadingOverlay video');
         if (loadingVideo) {
             loadingVideo.pause();
-            loadingVideo.currentTime = 0;
         }
         const mainMenuVideo = document.querySelector('.main-menu-video');
         if (mainMenuVideo) {
             mainMenuVideo.pause();
-            mainMenuVideo.currentTime = 0;
             mainMenuVideo.style.display = 'none';
         }
     }
@@ -1066,6 +1064,10 @@ class MundoKnifeGame3D {
         });
         
         if (!this.isMultiplayer && this.gameState.isRunning) {
+            const totalAIPlayers = [...this.team1, ...this.team2].filter(p => p.isAI && p.health > 0).length;
+            const baseThrowChance = 0.015;
+            const adjustedThrowChance = totalAIPlayers > 2 ? baseThrowChance / (totalAIPlayers / 2) : baseThrowChance;
+            
             [...this.team1, ...this.team2].forEach(player => {
                 if (!player.isAI || player.health <= 0 || player.isThrowingKnife) return;
                 
@@ -1080,7 +1082,7 @@ class MundoKnifeGame3D {
                     }
                 }
                 
-                if (Math.random() < 0.015 && Date.now() - player.lastKnifeTime > player.knifeCooldown) {
+                if (Math.random() < adjustedThrowChance && Date.now() - player.lastKnifeTime > player.knifeCooldown) {
                     const enemyTeam = player.team === 1 ? this.team2 : this.team1;
                     const aliveEnemies = enemyTeam.filter(e => e.health > 0);
                     
@@ -1427,13 +1429,11 @@ class MundoKnifeGame3D {
         const mainMenuVideo = document.querySelector('.main-menu-video');
         if (mainMenuVideo) {
             mainMenuVideo.pause();
-            mainMenuVideo.currentTime = 0;
             mainMenuVideo.style.display = 'none';
         }
         const loadingVideo = document.querySelector('#loadingOverlay video');
         if (loadingVideo) {
             loadingVideo.pause();
-            loadingVideo.currentTime = 0;
             loadingVideo.style.display = 'none';
         }
         
@@ -2071,7 +2071,6 @@ function startGame(isMultiplayer = false) {
     const mainMenuVideo = document.querySelector('.main-menu-video');
     if (mainMenuVideo) {
         mainMenuVideo.pause();
-        mainMenuVideo.currentTime = 0;
         mainMenuVideo.style.display = 'none';
     }
     
