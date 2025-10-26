@@ -1446,6 +1446,16 @@ class MundoKnifeGame3D {
                     if (typeof pauseMainMenuAudio === 'function') {
                         pauseMainMenuAudio();
                     }
+                    const mainMenuVideo = document.querySelector('.main-menu-video');
+                    if (mainMenuVideo) {
+                        mainMenuVideo.pause();
+                        mainMenuVideo.currentTime = 0;
+                    }
+                    const loadingVideo = document.querySelector('#loadingOverlay video');
+                    if (loadingVideo) {
+                        loadingVideo.pause();
+                        loadingVideo.currentTime = 0;
+                    }
                     const readyFightSound = document.getElementById('readyFightSound');
                     if (readyFightSound) {
                         readyFightSound.currentTime = 0;
