@@ -1330,8 +1330,14 @@ class MundoKnifeGame3D {
         overlay.style.display = 'flex';
         overlay.style.background = 'rgba(0, 0, 0, 0.8)';
         
-        const buttons = overlay.querySelectorAll('.restart-btn'); // (important-comment)
-        buttons.forEach(btn => btn.style.display = 'block'); // (important-comment)
+        const buttons = overlay.querySelectorAll('.restart-btn');
+        buttons.forEach(btn => {
+            if (this.isMultiplayer && btn.textContent.includes('Play Again')) {
+                btn.style.display = 'none';
+            } else {
+                btn.style.display = 'block';
+            }
+        });
     }
 
     updateHealthDisplay() {
@@ -1784,6 +1790,14 @@ function returnToMainMenu() {
     if (currentGame) {
         currentGame.dispose();
     }
+    
+    const mainMenuVideo = document.querySelector('.main-menu-video');
+    if (mainMenuVideo) {
+        mainMenuVideo.currentTime = 0;
+        mainMenuVideo.style.display = 'block';
+        mainMenuVideo.play().catch(e => console.log('Video play failed:', e));
+    }
+    
     showMainMenu();
 }
 
