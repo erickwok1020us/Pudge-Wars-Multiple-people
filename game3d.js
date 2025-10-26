@@ -12,6 +12,7 @@ class MundoKnifeGame3D {
         this.currentState = null;
         this.previousState = null;
         
+        
         this.eventListeners = {
             documentContextMenu: null,
             canvasContextMenu: null,
@@ -25,6 +26,11 @@ class MundoKnifeGame3D {
             total: 4,
             loaded: 0,
             currentAsset: ''
+        };
+        
+        this.fpsData = {
+            frames: 0,
+            lastFpsUpdate: performance.now()
         };
         
         this.showLoadingOverlay();
@@ -75,6 +81,17 @@ class MundoKnifeGame3D {
         const overlay = document.getElementById('loadingOverlay');
         if (overlay) {
             overlay.style.display = 'none';
+        }
+        const loadingVideo = document.querySelector('#loadingOverlay video');
+        if (loadingVideo) {
+            loadingVideo.pause();
+            loadingVideo.currentTime = 0;
+        }
+        const mainMenuVideo = document.querySelector('.main-menu-video');
+        if (mainMenuVideo) {
+            mainMenuVideo.pause();
+            mainMenuVideo.currentTime = 0;
+            mainMenuVideo.style.display = 'none';
         }
     }
 
@@ -261,7 +278,7 @@ class MundoKnifeGame3D {
 
     generateMissPattern() {
         const missIndices = [];
-        while (missIndices.length < 2) {
+        while (missIndices.length < 3) {
             const randomIndex = Math.floor(Math.random() * 7);
             if (!missIndices.includes(randomIndex)) {
                 missIndices.push(randomIndex);
@@ -312,28 +329,25 @@ class MundoKnifeGame3D {
     }
 
     isWithinMapBounds(x, z, player) {
+        const characterRadius = 6;
+        
         if (Math.abs(x) < 18) {
-            console.log('🚫 [BOUNDS] Blocked by river zone');
             return false;
         }
         
         if (player.team === 1 && x > -18) {
-            console.log('🚫 [BOUNDS] Team1 blocked from crossing to right side');
             return false;
         }
         if (player.team === 2 && x < 18) {
-            console.log('🚫 [BOUNDS] Team2 blocked from crossing to left side');
             return false;
         }
         
-        if (Math.abs(x) > 80 || Math.abs(z) > 68) {
-            console.log('🚫 [BOUNDS] Blocked by rectangular bounds');
+        if (Math.abs(x) > 80 - characterRadius || Math.abs(z) > 68) {
             return false;
         }
         
         const cornerDistance = Math.abs(x) + Math.abs(z);
         if (cornerDistance > 120) {
-            console.log('🚫 [BOUNDS] Blocked by octagonal corner');
             return false;
         }
         
@@ -379,7 +393,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 4000,
+                knifeCooldown: 5000,
                 mesh: null,
                 canAttack: index === 0,
                 isThrowingKnife: false,
@@ -418,7 +432,7 @@ class MundoKnifeGame3D {
                 targetZ: null,
                 moveSpeed: 0.39,
                 lastKnifeTime: 0,
-                knifeCooldown: 4000,
+                knifeCooldown: 5000,
                 mesh: null,
                 aiStartDelay: 0,
                 aiCanAttack: false,
@@ -622,7 +636,14 @@ class MundoKnifeGame3D {
             }
             
             if (newAnimation) {
-                newAnimation.reset().fadeIn(0.2).play();
+                newAnimation.reset().fadeIn(0.2);
+                
+                if (desiredState === 'death') {
+                    newAnimation.setLoop(THREE.LoopOnce);
+                    newAnimation.clampWhenFinished = true;
+                }
+                
+                newAnimation.play();
                 player.currentAnimation = newAnimation;
             }
             
@@ -675,10 +696,6 @@ class MundoKnifeGame3D {
     }
 
     setupEventListeners() {
-        console.log('🔧 [SETUP] setupEventListeners called');
-        console.log('🔧 [SETUP] renderer:', this.renderer);
-        console.log('🔧 [SETUP] renderer.domElement:', this.renderer.domElement);
-        
         this.eventListeners.documentContextMenu = (e) => {
             if (e.target !== this.renderer.domElement) {
                 e.preventDefault();
@@ -688,14 +705,11 @@ class MundoKnifeGame3D {
         document.addEventListener('contextmenu', this.eventListeners.documentContextMenu, true);
         
         this.eventListeners.canvasContextMenu = (e) => {
-            console.log('🔥 [EVENT] contextmenu event fired!', e);
             e.preventDefault();
             e.stopPropagation();
             this.handlePlayerMovement(e);
         };
         this.renderer.domElement.addEventListener('contextmenu', this.eventListeners.canvasContextMenu, true);
-        
-        console.log('🔧 [SETUP] contextmenu listener attached to canvas and document');
         
         this.eventListeners.keydown = (e) => {
             this.keys[e.key.toLowerCase()] = true;
@@ -746,7 +760,6 @@ class MundoKnifeGame3D {
 
     handlePlayerMovement(event) {
         if (this.player1.health <= 0) {
-            console.log(`☠️ [MOVEMENT] Player is dead, cannot move`);
             return;
         }
         
@@ -756,38 +769,11 @@ class MundoKnifeGame3D {
         this.mouse.x = mouseX;
         this.mouse.y = mouseY;
         
-        console.log(`🖱️ [MOUSE] Screen(${event.clientX}, ${event.clientY}) → NDC(${this.mouse.x.toFixed(3)}, ${this.mouse.y.toFixed(3)})`);
-        console.log(`📷 [CAMERA] position: x=${this.camera.position.x.toFixed(2)}, y=${this.camera.position.y.toFixed(2)}, z=${this.camera.position.z.toFixed(2)}`);
-        console.log(`📷 [CAMERA] rotation: x=${this.camera.rotation.x.toFixed(2)}, y=${this.camera.rotation.y.toFixed(2)}, z=${this.camera.rotation.z.toFixed(2)}`);
-        
-        console.log(`🔍 [RAYCAST] invisibleGround exists:`, !!this.invisibleGround);
-        if (this.invisibleGround) {
-            console.log(`🔍 [RAYCAST] invisibleGround.visible:`, this.invisibleGround.visible);
-            console.log(`🔍 [RAYCAST] invisibleGround.position: x=${this.invisibleGround.position.x.toFixed(2)}, y=${this.invisibleGround.position.y.toFixed(2)}, z=${this.invisibleGround.position.z.toFixed(2)}`);
-            console.log(`🔍 [RAYCAST] invisibleGround.rotation: x=${this.invisibleGround.rotation.x.toFixed(2)}, y=${this.invisibleGround.rotation.y.toFixed(2)}, z=${this.invisibleGround.rotation.z.toFixed(2)}`);
-            console.log(`🔍 [RAYCAST] invisibleGround.scale: x=${this.invisibleGround.scale.x.toFixed(2)}, y=${this.invisibleGround.scale.y.toFixed(2)}, z=${this.invisibleGround.scale.z.toFixed(2)}`);
-            console.log(`🔍 [RAYCAST] invisibleGround.geometry.type:`, this.invisibleGround.geometry.type);
-            if (this.invisibleGround.geometry.parameters) {
-                console.log(`🔍 [RAYCAST] invisibleGround.geometry size: width=${this.invisibleGround.geometry.parameters.width}, height=${this.invisibleGround.geometry.parameters.height}`);
-            }
-            console.log(`🔍 [RAYCAST] invisibleGround.material.side:`, this.invisibleGround.material.side, '(0=Front, 1=Back, 2=Double)');
-        }
-        
         this.raycaster.setFromCamera(this.mouse, this.camera);
-        console.log(`🔍 [RAYCAST] ray.origin: x=${this.raycaster.ray.origin.x.toFixed(2)}, y=${this.raycaster.ray.origin.y.toFixed(2)}, z=${this.raycaster.ray.origin.z.toFixed(2)}`);
-        console.log(`🔍 [RAYCAST] ray.direction: x=${this.raycaster.ray.direction.x.toFixed(3)}, y=${this.raycaster.ray.direction.y.toFixed(3)}, z=${this.raycaster.ray.direction.z.toFixed(3)}`);
-        
         const intersects = this.raycaster.intersectObject(this.invisibleGround);
-        
-        console.log(`🔍 [RAYCAST] intersects.length:`, intersects.length);
-        if (intersects.length > 0) {
-            console.log(`🔍 [RAYCAST] First intersection point:`, intersects[0].point);
-        }
         
         if (intersects.length > 0) {
             const point = intersects[0].point;
-            
-            console.log(`🎯 [CLICK] Screen(${event.clientX}, ${event.clientY}) → World(x=${point.x.toFixed(1)}, z=${point.z.toFixed(1)})`);
             
             const boundsCheck = this.isWithinMapBounds(point.x, point.z, this.player1);
             
@@ -806,14 +792,11 @@ class MundoKnifeGame3D {
                     targetZ: point.z
                 });
             }
-        } else {
-            console.log(`❌ [RAYCAST] No intersection with invisibleGround!`);
         }
     }
 
     throwKnifeTowardsMouse() {
         if (this.player1.health <= 0) {
-            console.log(`☠️ [ATTACK] Player is dead, cannot throw knife`);
             return;
         }
         
@@ -965,8 +948,15 @@ class MundoKnifeGame3D {
         knifeGroup.position.set(fromPlayer.x, playerY + spawnHeight, fromPlayer.z);
         knifeGroup.castShadow = true;
         
-        const dx = targetX - fromPlayer.x;
-        const dz = targetZ - fromPlayer.z;
+        let dx = targetX - fromPlayer.x;
+        let dz = targetZ - fromPlayer.z;
+        
+        if (fromPlayer.isAI) {
+            const inaccuracy = 0.40;
+            dx += (Math.random() - 0.5) * inaccuracy * Math.sqrt(dx * dx + dz * dz);
+            dz += (Math.random() - 0.5) * inaccuracy * Math.sqrt(dx * dx + dz * dz);
+        }
+        
         const distanceXZ = Math.sqrt(dx * dx + dz * dz);
         
         const directionXZ = {
@@ -1045,8 +1035,8 @@ class MundoKnifeGame3D {
             toPlayer.z - fromPlayer.z
         ).normalize();
         
-        if (fromPlayer === this.player2) {
-            const inaccuracy = 0.26;
+        if (fromPlayer.isAI) {
+            const inaccuracy = 0.40;
             direction.x += (Math.random() - 0.5) * inaccuracy;
             direction.z += (Math.random() - 0.5) * inaccuracy;
             direction.normalize();
@@ -1079,7 +1069,7 @@ class MundoKnifeGame3D {
             [...this.team1, ...this.team2].forEach(player => {
                 if (!player.isAI || player.health <= 0 || player.isThrowingKnife) return;
                 
-                if (Math.random() < 0.06) {
+                if (Math.random() < 0.10) {
                     const potentialX = player.x + (Math.random() - 0.5) * 30;
                     const potentialZ = player.z + (Math.random() - 0.5) * 30;
                     
@@ -1105,6 +1095,11 @@ class MundoKnifeGame3D {
     }
 
     updatePlayerMovement(player, dt) {
+        if (player.health <= 0) {
+            player.isMoving = false;
+            return;
+        }
+        
         if (player.isMoving && player.targetX !== null && player.targetZ !== null) {
             const dx = player.targetX - player.x;
             const dz = player.targetZ - player.z;
@@ -1429,6 +1424,19 @@ class MundoKnifeGame3D {
         
         countdownOverlay.style.display = 'flex';
         
+        const mainMenuVideo = document.querySelector('.main-menu-video');
+        if (mainMenuVideo) {
+            mainMenuVideo.pause();
+            mainMenuVideo.currentTime = 0;
+            mainMenuVideo.style.display = 'none';
+        }
+        const loadingVideo = document.querySelector('#loadingOverlay video');
+        if (loadingVideo) {
+            loadingVideo.pause();
+            loadingVideo.currentTime = 0;
+            loadingVideo.style.display = 'none';
+        }
+        
         this.player1.knifeCooldown = 5000;
         this.player2.knifeCooldown = 5000;
         this.player1.lastKnifeTime = Date.now();
@@ -1436,6 +1444,23 @@ class MundoKnifeGame3D {
         
         let count = 5;
         countdownNumber.textContent = count;
+        
+        const aiMovementInterval = setInterval(() => {
+            if (!this.isMultiplayer) {
+                [...this.team1, ...this.team2].forEach(player => {
+                    if (!player.isAI) return;
+                    
+                    const potentialX = player.x + (Math.random() - 0.5) * 60;
+                    const potentialZ = player.z + (Math.random() - 0.5) * 60;
+                    
+                    if (this.isWithinMapBounds(potentialX, potentialZ, player)) {
+                        player.targetX = potentialX;
+                        player.targetZ = potentialZ;
+                        player.isMoving = true;
+                    }
+                });
+            }
+        }, 300);
         
         const countdownInterval = setInterval(() => {
             count--;
@@ -1467,6 +1492,7 @@ class MundoKnifeGame3D {
                     this.player2.aiCanAttack = true;
                 }, 500);
                 clearInterval(countdownInterval);
+                clearInterval(aiMovementInterval);
             }
         }, 1000);
     }
@@ -1507,7 +1533,9 @@ class MundoKnifeGame3D {
         
         while (this.accumulator >= this.fixedDt) {
             if (this.gameState.isRunning || this.gameState.countdownActive) {
-                this.previousState = this.cloneGameState();
+                if (this.isMultiplayer) {
+                    this.previousState = this.cloneGameState();
+                }
                 this.updatePlayers(this.fixedDt);
                 this.updateCamera();
                 if (this.gameState.isRunning) {
@@ -1515,7 +1543,9 @@ class MundoKnifeGame3D {
                     this.updateKnives(this.fixedDt);
                     this.updateParticles();
                 }
-                this.currentState = this.cloneGameState();
+                if (this.isMultiplayer) {
+                    this.currentState = this.cloneGameState();
+                }
             }
             this.accumulator -= this.fixedDt;
         }
@@ -1526,14 +1556,39 @@ class MundoKnifeGame3D {
             }
         });
         
-        if ((this.gameState.isRunning || this.gameState.countdownActive) && this.previousState && this.currentState) {
-            const alpha = this.accumulator / this.fixedDt;
-            this.interpolateStates(alpha);
+        if (this.gameState.isRunning || this.gameState.countdownActive) {
+            if (this.isMultiplayer && this.previousState && this.currentState) {
+                const alpha = this.accumulator / this.fixedDt;
+                this.interpolateStates(alpha);
+            } else if (!this.isMultiplayer) {
+                [...this.team1, ...this.team2].forEach(player => {
+                    if (player && player.mesh) {
+                        player.mesh.position.x = player.x;
+                        player.mesh.position.z = player.z;
+                        player.mesh.rotation.y = player.rotation;
+                    }
+                });
+                
+                this.knives.forEach(knife => {
+                });
+            }
         }
         
         this.updateCooldownDisplay();
         this.updateHealthDisplay();
         this.renderer.render(this.scene, this.camera);
+        
+        this.fpsData.frames++;
+        if (currentTime - this.fpsData.lastFpsUpdate >= 500) {
+            const elapsed = currentTime - this.fpsData.lastFpsUpdate;
+            const fps = Math.round((this.fpsData.frames * 1000) / elapsed);
+            const fpsElement = document.getElementById('fpsValue');
+            if (fpsElement) {
+                fpsElement.textContent = fps;
+            }
+            this.fpsData.frames = 0;
+            this.fpsData.lastFpsUpdate = currentTime;
+        }
         
         this.gameLoopId = requestAnimationFrame(() => this.gameLoop());
     }
@@ -1801,6 +1856,12 @@ function selectMultiplayerMode(mode) {
     const maxPlayers = mode === '1v1' ? 2 : 6;
     playerSlots.innerHTML = '';
     
+    if (mode === '3v3') {
+        playerSlots.classList.add('mode-3v3');
+    } else {
+        playerSlots.classList.remove('mode-3v3');
+    }
+    
     for (let i = 1; i <= maxPlayers; i++) {
         const slot = document.createElement('div');
         slot.className = i === 1 ? 'player-slot occupied' : 'player-slot empty';
@@ -1816,7 +1877,8 @@ function selectMultiplayerMode(mode) {
     }
     
     if (!socket) {
-        socket = io('http://localhost:3000');
+        const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
+        socket = io(socketUrl);
     }
     
     socket.emit('createRoom', { roomCode: roomCode, gameMode: mode });
@@ -1898,7 +1960,8 @@ function joinRoom() {
     statusDiv.innerHTML = '<p style="color: #4CAF50;">Connecting to room...</p>';
     
     if (!socket) {
-        socket = io('http://localhost:3000');
+        const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
+        socket = io(socketUrl);
     }
     
     socket.emit('joinRoom', { roomCode: inputCode });
@@ -2004,6 +2067,13 @@ function startGame(isMultiplayer = false) {
     document.getElementById('createRoomInterface').style.display = 'none';
     document.getElementById('joinRoomInterface').style.display = 'none';
     document.getElementById('gameContainer').style.display = 'block';
+    
+    const mainMenuVideo = document.querySelector('.main-menu-video');
+    if (mainMenuVideo) {
+        mainMenuVideo.pause();
+        mainMenuVideo.currentTime = 0;
+        mainMenuVideo.style.display = 'none';
+    }
     
     currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost, practiceMode);
 }
