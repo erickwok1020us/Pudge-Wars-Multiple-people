@@ -50,7 +50,13 @@ class MundoKnifeGame3D {
             if (this.loadingTimeout) {
                 clearTimeout(this.loadingTimeout);
             }
-            this.hideLoadingOverlay();
+            
+            if (this.isMultiplayer && socket && roomCode) {
+                socket.emit('playerLoaded', { roomCode });
+                this.updateLoadingStatus();
+            } else {
+                this.hideLoadingOverlay();
+            }
         }).catch(error => {
             console.error('Failed to load character animations:', error);
             console.log('Initializing game with fallback assets...');
@@ -62,7 +68,13 @@ class MundoKnifeGame3D {
             if (this.loadingTimeout) {
                 clearTimeout(this.loadingTimeout);
             }
-            this.hideLoadingOverlay();
+            
+            if (this.isMultiplayer && socket && roomCode) {
+                socket.emit('playerLoaded', { roomCode });
+                this.updateLoadingStatus();
+            } else {
+                this.hideLoadingOverlay();
+            }
         });
     }
 
@@ -85,12 +97,29 @@ class MundoKnifeGame3D {
         const loadingVideo = document.querySelector('#loadingOverlay video');
         if (loadingVideo) {
             loadingVideo.pause();
+            loadingVideo.style.display = 'none';
         }
         const mainMenuVideo = document.querySelector('.main-menu-video');
         if (mainMenuVideo) {
             mainMenuVideo.pause();
             mainMenuVideo.style.display = 'none';
         }
+        
+        const gameContainer = document.getElementById('gameContainer');
+        if (gameContainer) {
+            gameContainer.style.display = 'block';
+        }
+        const gameCanvas = document.getElementById('gameCanvas');
+        if (gameCanvas) {
+            gameCanvas.style.display = 'block';
+        }
+    }
+    
+    updateLoadingStatus() {
+        const statusContainer = document.getElementById('playerLoadingStatus');
+        if (!statusContainer) return;
+        
+        statusContainer.style.display = 'block';
     }
 
     updateLoadingProgress(assetName) {
@@ -276,7 +305,7 @@ class MundoKnifeGame3D {
 
     generateMissPattern() {
         const missIndices = [];
-        while (missIndices.length < 3) {
+        while (missIndices.length < 4) {
             const randomIndex = Math.floor(Math.random() * 7);
             if (!missIndices.includes(randomIndex)) {
                 missIndices.push(randomIndex);
@@ -859,7 +888,7 @@ class MundoKnifeGame3D {
                 const distance = Math.sqrt(dx * dx + dz * dz);
                 
                 if (distance > 0.1) {
-                    const predictionTime = 0.5;
+                    const predictionTime = 0.3;
                     const predictedDistance = this.player1.moveSpeed * 60 * predictionTime;
                     const dirX = dx / distance;
                     const dirZ = dz / distance;
@@ -872,8 +901,8 @@ class MundoKnifeGame3D {
             const shouldMiss = this.player2.missPattern.includes(this.player2.throwCount);
             
             if (shouldMiss) {
-                const largeOffsetX = (Math.random() - 0.5) * 12;
-                const largeOffsetZ = (Math.random() - 0.5) * 12;
+                const largeOffsetX = (Math.random() - 0.5) * 15;
+                const largeOffsetZ = (Math.random() - 0.5) * 15;
                 targetX += largeOffsetX;
                 targetZ += largeOffsetZ;
             } else {
@@ -1535,6 +1564,25 @@ class MundoKnifeGame3D {
                 this.player2.health = data.health;
             }
             this.updateHealthDisplay();
+        });
+        
+        socket.on('playerLoadUpdate', (playerLoadStatus) => {
+            const statusContainer = document.getElementById('playerLoadingStatus');
+            if (!statusContainer) return;
+            
+            let statusHTML = '<div style="color: white; font-size: 18px; margin-top: 20px;">Loading Status:</div>';
+            Object.entries(playerLoadStatus).forEach(([playerId, loaded]) => {
+                const status = loaded ? '✓ Loaded' : '⏳ Loading...';
+                const color = loaded ? '#4CAF50' : '#FFA500';
+                statusHTML += `<div style="color: ${color}; font-size: 16px; margin: 5px 0;">Player ${playerId}: ${status}</div>`;
+            });
+            statusContainer.innerHTML = statusHTML;
+        });
+        
+        socket.on('allPlayersLoaded', () => {
+            console.log('All players loaded, starting countdown');
+            this.hideLoadingOverlay();
+            this.startCountdown();
         });
 
     }
