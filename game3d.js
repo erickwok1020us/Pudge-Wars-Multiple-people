@@ -798,13 +798,11 @@ class MundoKnifeGame3D {
                 if (child.material) {
                     if (Array.isArray(child.material)) {
                         child.material.forEach((mat) => {
-                            mat.color.set(player.color);
                             mat.roughness = 0.95;
                             mat.metalness = 0.05;
                             mat.needsUpdate = true;
                         });
                     } else {
-                        child.material.color.set(player.color);
                         child.material.roughness = 0.95;
                         child.material.metalness = 0.05;
                         child.material.needsUpdate = true;
