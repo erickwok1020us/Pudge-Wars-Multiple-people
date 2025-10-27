@@ -1,5 +1,177 @@
 const CDN_BASE_URL = 'https://pub-2d994ab822d5426bad338ecb218683d8.r2.dev';
 
+let preloadedAssets = {
+    characterModel: null,
+    animations: {},
+    scene: null,
+    renderer: null,
+    camera: null,
+    terrain: null,
+    lights: [],
+    isLoaded: false,
+    isLoading: false
+};
+
+function updateInitialLoadingProgress(progress, text, detail = '') {
+    const bar = document.getElementById('initialLoadingBar');
+    const textEl = document.getElementById('initialLoadingText');
+    const detailEl = document.getElementById('initialLoadingDetail');
+    
+    if (bar) bar.style.width = `${progress}%`;
+    if (textEl) textEl.textContent = text;
+    if (detailEl) detailEl.textContent = detail;
+}
+
+async function preloadGameAssets() {
+    if (preloadedAssets.isLoaded || preloadedAssets.isLoading) {
+        return preloadedAssets;
+    }
+    
+    preloadedAssets.isLoading = true;
+    console.log('Starting parallel asset preload...');
+    const startTime = performance.now();
+    
+    try {
+        updateInitialLoadingProgress(0, 'Loading character animations...', 'Downloading FBX files...');
+        
+        const loader = new THREE.FBXLoader();
+        const animationFiles = {
+            idle: `${CDN_BASE_URL}/Animation_Idle_frame_rate_60.fbx`,
+            run: `${CDN_BASE_URL}/Animation_Run_60.fbx`,
+            death: `${CDN_BASE_URL}/Animation_Death_60.fbx`
+        };
+        
+        let loadedCount = 0;
+        const totalFiles = Object.keys(animationFiles).length;
+        
+        const loadPromises = Object.entries(animationFiles).map(([key, file]) => {
+            return new Promise((resolve, reject) => {
+                loader.load(file, (fbx) => {
+                    if (key === 'idle') {
+                        preloadedAssets.characterModel = fbx;
+                    }
+                    preloadedAssets.animations[key] = fbx.animations[0];
+                    loadedCount++;
+                    const progress = Math.floor((loadedCount / totalFiles) * 60);
+                    updateInitialLoadingProgress(progress, 'Loading character animations...', `Loaded ${key} animation (${loadedCount}/${totalFiles})`);
+                    console.log(`Preloaded: ${key} Animation`);
+                    resolve();
+                }, undefined, reject);
+            });
+        });
+        
+        await Promise.all(loadPromises);
+        
+        updateInitialLoadingProgress(60, 'Initializing 3D engine...', 'Setting up Three.js renderer...');
+        await new Promise(resolve => setTimeout(resolve, 50)); // Allow UI update
+        
+        preloadedAssets.scene = new THREE.Scene();
+        preloadedAssets.scene.background = new THREE.Color(0x87CEEB);
+        
+        preloadedAssets.renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: true,
+            powerPreference: "high-performance"
+        });
+        preloadedAssets.renderer.setSize(window.innerWidth, window.innerHeight);
+        preloadedAssets.renderer.shadowMap.enabled = true;
+        preloadedAssets.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        preloadedAssets.camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        preloadedAssets.camera.position.set(0, 15, 20);
+        preloadedAssets.camera.lookAt(0, 0, 0);
+        
+        console.log('Three.js scene initialized');
+        
+        updateInitialLoadingProgress(70, 'Setting up lighting...', 'Creating ambient and directional lights...');
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        preloadedAssets.scene.add(ambientLight);
+        preloadedAssets.lights.push(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 20, 10);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 50;
+        directionalLight.shadow.camera.left = -30;
+        directionalLight.shadow.camera.right = 30;
+        directionalLight.shadow.camera.top = 30;
+        directionalLight.shadow.camera.bottom = -30;
+        preloadedAssets.scene.add(directionalLight);
+        preloadedAssets.lights.push(directionalLight);
+        
+        console.log('Lighting setup complete');
+        
+        updateInitialLoadingProgress(80, 'Building game terrain...', 'Creating ground and river...');
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x2d5016,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        preloadedAssets.scene.add(ground);
+        
+        const riverGeometry = new THREE.PlaneGeometry(100, 4);
+        const riverMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x4a90e2,
+            roughness: 0.3,
+            metalness: 0.5,
+            transparent: true,
+            opacity: 0.8
+        });
+        const river = new THREE.Mesh(riverGeometry, riverMaterial);
+        river.rotation.x = -Math.PI / 2;
+        river.position.y = 0.01;
+        river.receiveShadow = true;
+        preloadedAssets.scene.add(river);
+        
+        const invisibleGroundGeometry = new THREE.PlaneGeometry(100, 100);
+        const invisibleGroundMaterial = new THREE.MeshBasicMaterial({ 
+            visible: false
+        });
+        const invisibleGround = new THREE.Mesh(invisibleGroundGeometry, invisibleGroundMaterial);
+        invisibleGround.rotation.x = -Math.PI / 2;
+        invisibleGround.position.y = 0;
+        preloadedAssets.scene.add(invisibleGround);
+        
+        preloadedAssets.terrain = {
+            ground,
+            river,
+            invisibleGround
+        };
+        
+        console.log('Terrain created');
+        
+        updateInitialLoadingProgress(100, 'Ready to play!', 'All assets loaded successfully');
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        preloadedAssets.isLoaded = true;
+        preloadedAssets.isLoading = false;
+        const loadTime = ((performance.now() - startTime) / 1000).toFixed(2);
+        console.log(`All assets preloaded successfully in ${loadTime}s!`);
+    } catch (error) {
+        console.error('Asset preload failed:', error);
+        preloadedAssets.isLoading = false;
+        updateInitialLoadingProgress(0, 'Loading failed', error.message);
+    }
+    
+    return preloadedAssets;
+}
+
 class MundoKnifeGame3D {
     constructor(mode = 'practice', isMultiplayer = false, isHostPlayer = false, practiceMode = '1v1') {
         this.gameMode = mode;
@@ -23,7 +195,7 @@ class MundoKnifeGame3D {
         };
         
         this.loadingProgress = {
-            total: 4,
+            total: 1,
             loaded: 0,
             currentAsset: ''
         };
@@ -39,7 +211,20 @@ class MundoKnifeGame3D {
             this.hideLoadingOverlay();
         }, 15000);
         
-        this.setupThreeJS();
+        if (preloadedAssets.scene && preloadedAssets.renderer && preloadedAssets.camera) {
+            console.log('Using preloaded scene, renderer, and camera');
+            this.scene = preloadedAssets.scene;
+            this.renderer = preloadedAssets.renderer;
+            this.camera = preloadedAssets.camera;
+            
+            const canvas = document.getElementById('gameCanvas');
+            if (canvas && !canvas.firstChild) {
+                canvas.appendChild(this.renderer.domElement);
+            }
+        } else {
+            console.log('Preloaded assets not available, creating new scene');
+            this.setupThreeJS();
+        }
         
         this.loadCharacterAnimations().then(() => {
             this.initializeGame();
@@ -101,6 +286,7 @@ class MundoKnifeGame3D {
     }
 
     hideLoadingOverlay() {
+        console.log('hideLoadingOverlay() called, isMultiplayer:', this.isMultiplayer);
         const overlay = document.getElementById('loadingOverlay');
         if (overlay) {
             overlay.style.display = 'none';
@@ -154,16 +340,33 @@ class MundoKnifeGame3D {
         if (loadingAsset) loadingAsset.textContent = assetName;
         
         if (percentage >= 100) {
-            setTimeout(() => {
-                if (this.loadingTimeout) {
-                    clearTimeout(this.loadingTimeout);
-                }
-                this.hideLoadingOverlay();
-            }, 500);
+            console.log('Loading progress reached 100%');
+            if (!this.isMultiplayer) {
+                console.log('Single player mode, hiding loading overlay in 500ms');
+                setTimeout(() => {
+                    if (this.loadingTimeout) {
+                        clearTimeout(this.loadingTimeout);
+                    }
+                    console.log('Calling hideLoadingOverlay() from updateLoadingProgress');
+                    this.hideLoadingOverlay();
+                }, 500);
+            } else {
+                console.log('Multiplayer mode, NOT hiding loading overlay automatically');
+            }
         }
     }
 
     async loadCharacterAnimations() {
+        if (preloadedAssets.isLoaded) {
+            console.log('Using preloaded assets');
+            this.characterModel = preloadedAssets.characterModel;
+            this.animations = preloadedAssets.animations;
+            this.updateLoadingProgress('Idle Animation');
+            this.updateLoadingProgress('Running Animation');
+            this.updateLoadingProgress('Death Animation');
+            return Promise.resolve();
+        }
+        
         const loader = new THREE.FBXLoader();
         
         const animationFiles = {
@@ -529,7 +732,10 @@ class MundoKnifeGame3D {
         this.updateHealthDisplay();
         
         if (!this.isMultiplayer) {
+            console.log('Single player mode detected, starting countdown immediately');
             this.startCountdown();
+        } else {
+            console.log('Multiplayer mode detected, waiting for allPlayersLoaded event');
         }
         
         this.startLatencyMeasurement();
@@ -2113,6 +2319,11 @@ function joinRoom() {
             const modeText = data.gameMode === '1v1' ? '1v1 (2 Players)' : '3v3 (6 Players)';
             statusDiv.innerHTML = `<p style="color: #4CAF50;">Successfully joined ${modeText} room! Waiting for host to start...</p>`;
             
+            const joinGameBtn = document.getElementById('joinGameBtn');
+            if (joinGameBtn) {
+                joinGameBtn.style.display = 'none';
+            }
+            
             const readyBtn = document.getElementById('readyBtnJoin');
             if (readyBtn) {
                 readyBtn.style.display = 'block';
@@ -2212,6 +2423,20 @@ function startGame(isMultiplayer = false) {
     currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost, practiceMode);
 }
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+    console.log('Page loaded, starting asset preload...');
+    await preloadGameAssets();
+    console.log('Asset preload complete, showing main menu');
+    
+    const initialLoadingScreen = document.getElementById('initialLoadingScreen');
+    if (initialLoadingScreen) {
+        initialLoadingScreen.style.display = 'none';
+    }
+    
+    const mainMenuVideo = document.querySelector('.main-menu-video');
+    if (mainMenuVideo) {
+        mainMenuVideo.style.display = 'block';
+    }
+    
     showMainMenu();
 });

@@ -718,15 +718,109 @@
             background: rgba(128, 128, 128, 0.3);
             border-color: rgba(0, 0, 0, 0.6);
         }
+        /* Initial Loading Screen (for FBX preload) */
+        #initialLoadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        #initialLoadingScreen video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transform: scale(0.9);
+            opacity: 0.5;
+        }
+
+        #initialLoadingScreen .loading-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 40px;
+            background: rgba(30, 30, 30, 0.3);
+            border-radius: 12px;
+            border: 2px solid rgba(139, 0, 0, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            width: 95%;
+            max-width: 600px;
+        }
+
+        #initialLoadingScreen h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 2em;
+            margin-bottom: 30px;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        #initialLoadingScreen .loading-bar-container {
+            width: 100%;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 2px solid rgba(139, 0, 0, 0.3);
+        }
+
+        #initialLoadingScreen .loading-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #8b0000, #ff0000, #8b0000);
+            background-size: 200% 100%;
+            animation: loadingGradient 2s ease infinite;
+            transition: width 0.3s ease;
+            border-radius: 15px;
+        }
+
+        #initialLoadingScreen p {
+            font-family: 'Cinzel', serif;
+            font-size: 1.2em;
+            margin: 10px 0;
+            color: #ffffff;
+        }
+
+        #initialLoadingScreen .loading-detail {
+            font-family: 'Cinzel', serif;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body>
+    <!-- Initial Loading Screen (for FBX preload) -->
+    <div id="initialLoadingScreen">
+        <video autoplay muted loop playsinline>
+            <source src="vidu-video-3009247506385883.mp4" type="video/mp4">
+        </video>
+        <div class="loading-content">
+            <h2>Loading Game Assets</h2>
+            <div class="loading-bar-container">
+                <div class="loading-bar" id="initialLoadingBar"></div>
+            </div>
+            <p id="initialLoadingText">Preparing game...</p>
+            <p class="loading-detail" id="initialLoadingDetail"></p>
+        </div>
+    </div>
+
     <!-- Shared background video for all menu screens -->
-    <video class="main-menu-video" autoplay loop muted playsinline preload="auto">
+    <video class="main-menu-video" autoplay loop muted playsinline preload="auto" style="display: none;">
         <source src="vidu-video-3009247506385883.mp4" type="video/mp4">
     </video>
     
-    <div class="main-menu" id="mainMenu">
+    <div class="main-menu" id="mainMenu" style="display: none;">
         <audio id="mainMenuAudio" autoplay loop muted preload="auto">
             <source src="audio-editor-output.mp3" type="audio/mpeg">
         </audio>
@@ -825,7 +919,7 @@
             <p>Enter the room code to join a game:</p>
             <input type="text" class="room-input" id="roomCodeInput" placeholder="Enter room code..." maxlength="6">
             <br>
-            <button class="menu-btn" onclick="joinRoom()">Join Game</button>
+            <button class="menu-btn" id="joinGameBtn" onclick="joinRoom()">Join Game</button>
             <button class="menu-btn" id="readyBtnJoin" onclick="toggleReady()" style="display: none; margin-top: 20px;">Ready</button>
             <div id="joinStatus" style="margin-top: 20px;"></div>
             <button class="back-btn" onclick="showMainMenu()">← Back</button>
