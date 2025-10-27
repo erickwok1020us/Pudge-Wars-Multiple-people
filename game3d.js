@@ -1,5 +1,195 @@
 const CDN_BASE_URL = 'https://pub-2d994ab822d5426bad338ecb218683d8.r2.dev';
 
+let preloadedAssets = {
+    characterModel: null,
+    animations: {},
+    scene: null,
+    renderer: null,
+    camera: null,
+    terrain: null,
+    lights: [],
+    isLoaded: false,
+    isLoading: false
+};
+
+function updateInitialLoadingProgress(progress, text, detail = '') {
+    const bar = document.getElementById('initialLoadingBar');
+    const textEl = document.getElementById('initialLoadingText');
+    const detailEl = document.getElementById('initialLoadingDetail');
+    
+    if (bar) bar.style.width = `${progress}%`;
+    if (textEl) textEl.textContent = text;
+    if (detailEl) detailEl.textContent = detail;
+}
+
+async function preloadGameAssets() {
+    if (preloadedAssets.isLoaded || preloadedAssets.isLoading) {
+        return preloadedAssets;
+    }
+    
+    preloadedAssets.isLoading = true;
+    console.log('Starting parallel asset preload...');
+    const startTime = performance.now();
+    
+    try {
+        updateInitialLoadingProgress(0, 'Loading character animations...', 'Downloading FBX files...');
+        
+        const loader = new THREE.FBXLoader();
+        const animationFiles = {
+            idle: `${CDN_BASE_URL}/Animation_Idle_frame_rate_60.fbx`,
+            run: `${CDN_BASE_URL}/Animation_Run_60.fbx`,
+            death: `${CDN_BASE_URL}/Animation_Death_60.fbx`
+        };
+        
+        let loadedCount = 0;
+        const totalFiles = Object.keys(animationFiles).length;
+        
+        const loadPromises = Object.entries(animationFiles).map(([key, file]) => {
+            return new Promise((resolve, reject) => {
+                loader.load(file, (fbx) => {
+                    if (key === 'idle') {
+                        preloadedAssets.characterModel = fbx;
+                    }
+                    preloadedAssets.animations[key] = fbx.animations[0];
+                    loadedCount++;
+                    const progress = Math.floor((loadedCount / totalFiles) * 60);
+                    updateInitialLoadingProgress(progress, 'Loading character animations...', `Loaded ${key} animation (${loadedCount}/${totalFiles})`);
+                    console.log(`Preloaded: ${key} Animation`);
+                    resolve();
+                }, undefined, reject);
+            });
+        });
+        
+        await Promise.all(loadPromises);
+        
+        updateInitialLoadingProgress(60, 'Initializing 3D engine...', 'Setting up Three.js renderer...');
+        await new Promise(resolve => setTimeout(resolve, 50)); // Allow UI update
+        
+        preloadedAssets.scene = new THREE.Scene();
+        preloadedAssets.scene.background = new THREE.Color(0x000000);
+        
+        preloadedAssets.renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: true,
+            powerPreference: "high-performance"
+        });
+        preloadedAssets.renderer.setSize(window.innerWidth, window.innerHeight);
+        preloadedAssets.renderer.shadowMap.enabled = true;
+        preloadedAssets.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        preloadedAssets.camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        preloadedAssets.camera.position.set(0, 15, 20);
+        preloadedAssets.camera.lookAt(0, 0, 0);
+        
+        console.log('Three.js scene initialized');
+        
+        updateInitialLoadingProgress(70, 'Setting up lighting...', 'Creating ambient and directional lights...');
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        preloadedAssets.scene.add(ambientLight);
+        preloadedAssets.lights.push(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 20, 10);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 50;
+        directionalLight.shadow.camera.left = -30;
+        directionalLight.shadow.camera.right = 30;
+        directionalLight.shadow.camera.top = 30;
+        directionalLight.shadow.camera.bottom = -30;
+        preloadedAssets.scene.add(directionalLight);
+        preloadedAssets.lights.push(directionalLight);
+        
+        console.log('Lighting setup complete');
+        
+        updateInitialLoadingProgress(80, 'Building game terrain...', 'Loading 3D map model...');
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        const gltfLoader = new THREE.GLTFLoader();
+        await new Promise((resolve, reject) => {
+            gltfLoader.load(`${CDN_BASE_URL}/new_map.glb`, (gltf) => {
+                const mapModel = gltf.scene;
+                
+                const box = new THREE.Box3().setFromObject(mapModel);
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                
+                const scaleX = 200 / size.x;
+                const scaleZ = 150 / size.z;
+                const uniformScale = Math.min(scaleX, scaleZ);
+                
+                mapModel.scale.set(uniformScale, uniformScale, uniformScale);
+                mapModel.rotation.y = Math.PI / 2;
+                mapModel.position.y = 0;
+                
+                mapModel.traverse((child) => {
+                    if (child.isMesh) {
+                        if (child.name === 'Mesh_0' && child.material) {
+                            child.material.color.set(0x4db8ff);
+                            child.material.needsUpdate = true;
+                        }
+                    }
+                });
+                
+                preloadedAssets.scene.add(mapModel);
+                
+                const scaledBox = new THREE.Box3().setFromObject(mapModel);
+                const scaledSize = new THREE.Vector3();
+                scaledBox.getSize(scaledSize);
+                
+                const groundSurfaceY = scaledBox.max.y;
+                
+                const invisibleGroundGeometry = new THREE.PlaneGeometry(500, 500);
+                const invisibleGroundMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0x000000, 
+                    transparent: true, 
+                    opacity: 0,
+                    side: THREE.DoubleSide
+                });
+                const invisibleGround = new THREE.Mesh(invisibleGroundGeometry, invisibleGroundMaterial);
+                invisibleGround.rotation.x = -Math.PI / 2;
+                invisibleGround.position.y = groundSurfaceY;
+                preloadedAssets.scene.add(invisibleGround);
+                
+                preloadedAssets.terrain = {
+                    ground: mapModel,
+                    invisibleGround: invisibleGround,
+                    groundSurfaceY: groundSurfaceY
+                };
+                
+                console.log('3D map model loaded and added to scene');
+                resolve();
+            }, undefined, (error) => {
+                console.error('Error loading GLB map during preload:', error);
+                reject(error);
+            });
+        });
+        
+        updateInitialLoadingProgress(100, 'Ready to play!', 'All assets loaded successfully');
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        preloadedAssets.isLoaded = true;
+        preloadedAssets.isLoading = false;
+        const loadTime = ((performance.now() - startTime) / 1000).toFixed(2);
+        console.log(`All assets preloaded successfully in ${loadTime}s!`);
+    } catch (error) {
+        console.error('Asset preload failed:', error);
+        preloadedAssets.isLoading = false;
+        updateInitialLoadingProgress(0, 'Loading failed', error.message);
+    }
+    
+    return preloadedAssets;
+}
+
 class MundoKnifeGame3D {
     constructor(mode = 'practice', isMultiplayer = false, isHostPlayer = false, practiceMode = '1v1') {
         this.gameMode = mode;
@@ -23,7 +213,7 @@ class MundoKnifeGame3D {
         };
         
         this.loadingProgress = {
-            total: 4,
+            total: 1,
             loaded: 0,
             currentAsset: ''
         };
@@ -39,7 +229,27 @@ class MundoKnifeGame3D {
             this.hideLoadingOverlay();
         }, 15000);
         
-        this.setupThreeJS();
+        if (preloadedAssets.scene && preloadedAssets.renderer && preloadedAssets.camera) {
+            console.log('Using preloaded scene, renderer, and camera');
+            this.scene = preloadedAssets.scene;
+            this.renderer = preloadedAssets.renderer;
+            this.camera = preloadedAssets.camera;
+            
+            const canvas = document.getElementById('gameCanvas');
+            if (canvas && !canvas.firstChild) {
+                canvas.appendChild(this.renderer.domElement);
+            }
+            
+            if (preloadedAssets.terrain) {
+                console.log('Using preloaded terrain');
+                this.ground = preloadedAssets.terrain.ground;
+                this.invisibleGround = preloadedAssets.terrain.invisibleGround;
+                this.groundSurfaceY = preloadedAssets.terrain.groundSurfaceY;
+            }
+        } else {
+            console.log('Preloaded assets not available, creating new scene');
+            this.setupThreeJS();
+        }
         
         this.loadCharacterAnimations().then(() => {
             this.initializeGame();
@@ -52,9 +262,11 @@ class MundoKnifeGame3D {
             }
             
             if (this.isMultiplayer && socket && roomCode) {
+                console.log('Emitting playerLoaded event for room:', roomCode);
                 socket.emit('playerLoaded', { roomCode });
                 this.updateLoadingStatus();
             } else {
+                console.log('Single player mode or missing socket/roomCode, hiding loading overlay');
                 this.hideLoadingOverlay();
             }
         }).catch(error => {
@@ -70,9 +282,11 @@ class MundoKnifeGame3D {
             }
             
             if (this.isMultiplayer && socket && roomCode) {
+                console.log('Emitting playerLoaded event for room:', roomCode);
                 socket.emit('playerLoaded', { roomCode });
                 this.updateLoadingStatus();
             } else {
+                console.log('Single player mode or missing socket/roomCode, hiding loading overlay');
                 this.hideLoadingOverlay();
             }
         });
@@ -87,13 +301,27 @@ class MundoKnifeGame3D {
         if (overlay) {
             overlay.style.display = 'flex';
         }
+        
+        if (this.isMultiplayer) {
+            const statusContainer = document.getElementById('playerLoadingStatus');
+            if (statusContainer) {
+                statusContainer.style.display = 'block';
+            }
+        }
     }
 
     hideLoadingOverlay() {
+        console.log('hideLoadingOverlay() called, isMultiplayer:', this.isMultiplayer);
         const overlay = document.getElementById('loadingOverlay');
         if (overlay) {
             overlay.style.display = 'none';
         }
+        
+        const statusContainer = document.getElementById('playerLoadingStatus');
+        if (statusContainer) {
+            statusContainer.style.display = 'none';
+        }
+        
         const loadingVideo = document.querySelector('#loadingOverlay video');
         if (loadingVideo) {
             loadingVideo.pause();
@@ -137,16 +365,33 @@ class MundoKnifeGame3D {
         if (loadingAsset) loadingAsset.textContent = assetName;
         
         if (percentage >= 100) {
-            setTimeout(() => {
-                if (this.loadingTimeout) {
-                    clearTimeout(this.loadingTimeout);
-                }
-                this.hideLoadingOverlay();
-            }, 500);
+            console.log('Loading progress reached 100%');
+            if (!this.isMultiplayer) {
+                console.log('Single player mode, hiding loading overlay in 500ms');
+                setTimeout(() => {
+                    if (this.loadingTimeout) {
+                        clearTimeout(this.loadingTimeout);
+                    }
+                    console.log('Calling hideLoadingOverlay() from updateLoadingProgress');
+                    this.hideLoadingOverlay();
+                }, 500);
+            } else {
+                console.log('Multiplayer mode, NOT hiding loading overlay automatically');
+            }
         }
     }
 
     async loadCharacterAnimations() {
+        if (preloadedAssets.isLoaded) {
+            console.log('Using preloaded assets');
+            this.characterModel = preloadedAssets.characterModel;
+            this.animations = preloadedAssets.animations;
+            this.updateLoadingProgress('Idle Animation');
+            this.updateLoadingProgress('Running Animation');
+            this.updateLoadingProgress('Death Animation');
+            return Promise.resolve();
+        }
+        
         const loader = new THREE.FBXLoader();
         
         const animationFiles = {
@@ -412,7 +657,7 @@ class MundoKnifeGame3D {
                 z: pos.z,
                 health: 5,
                 maxHealth: 5,
-                color: index === 0 ? 0x9370DB : 0x6A5ACD,
+                color: 0xFFFFFF,
                 facing: pos.facing,
                 rotation: 0,
                 isMoving: false,
@@ -451,7 +696,7 @@ class MundoKnifeGame3D {
                 z: pos.z,
                 health: 5,
                 maxHealth: 5,
-                color: 0xFF6347,
+                color: 0xFFFFFF,
                 facing: pos.facing,
                 rotation: 0,
                 isMoving: false,
@@ -510,7 +755,14 @@ class MundoKnifeGame3D {
         this.setupCamera();
         this.createHealthBarElements();
         this.updateHealthDisplay();
-        this.startCountdown();
+        
+        if (!this.isMultiplayer) {
+            console.log('Single player mode detected, starting countdown immediately');
+            this.startCountdown();
+        } else {
+            console.log('Multiplayer mode detected, waiting for allPlayersLoaded event');
+        }
+        
         this.startLatencyMeasurement();
     }
 
@@ -1357,7 +1609,7 @@ class MundoKnifeGame3D {
             message.textContent = winnerId === 1 ? 'Victory!' : 'Defeated!';
         }
         overlay.style.display = 'flex';
-        overlay.style.background = 'rgba(0, 0, 0, 0.8)';
+        overlay.style.background = 'transparent';
         
         const buttons = overlay.querySelectorAll('.restart-btn');
         buttons.forEach(btn => {
@@ -1567,6 +1819,7 @@ class MundoKnifeGame3D {
         });
         
         socket.on('playerLoadUpdate', (playerLoadStatus) => {
+            console.log('Received playerLoadUpdate:', playerLoadStatus);
             const statusContainer = document.getElementById('playerLoadingStatus');
             if (!statusContainer) return;
             
@@ -1598,18 +1851,12 @@ class MundoKnifeGame3D {
         
         while (this.accumulator >= this.fixedDt) {
             if (this.gameState.isRunning || this.gameState.countdownActive) {
-                if (this.isMultiplayer) {
-                    this.previousState = this.cloneGameState();
-                }
                 this.updatePlayers(this.fixedDt);
                 this.updateCamera();
                 if (this.gameState.isRunning) {
                     this.throwKnife();
                     this.updateKnives(this.fixedDt);
                     this.updateParticles();
-                }
-                if (this.isMultiplayer) {
-                    this.currentState = this.cloneGameState();
                 }
             }
             this.accumulator -= this.fixedDt;
@@ -1622,21 +1869,13 @@ class MundoKnifeGame3D {
         });
         
         if (this.gameState.isRunning || this.gameState.countdownActive) {
-            if (this.isMultiplayer && this.previousState && this.currentState) {
-                const alpha = this.accumulator / this.fixedDt;
-                this.interpolateStates(alpha);
-            } else if (!this.isMultiplayer) {
-                [...this.team1, ...this.team2].forEach(player => {
-                    if (player && player.mesh) {
-                        player.mesh.position.x = player.x;
-                        player.mesh.position.z = player.z;
-                        player.mesh.rotation.y = player.rotation;
-                    }
-                });
-                
-                this.knives.forEach(knife => {
-                });
-            }
+            [...this.team1, ...this.team2].forEach(player => {
+                if (player && player.mesh) {
+                    player.mesh.position.x = player.x;
+                    player.mesh.position.z = player.z;
+                    player.mesh.rotation.y = player.rotation;
+                }
+            });
         }
         
         this.updateCooldownDisplay();
@@ -1951,7 +2190,34 @@ function selectMultiplayerMode(mode) {
     
     if (!socket) {
         const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
-        socket = io(socketUrl);
+        socket = io(socketUrl, {
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5,
+            transports: ['websocket', 'polling']
+        });
+        
+        socket.on('connect', () => {
+            console.log('Socket connected:', socket.id);
+        });
+        
+        socket.on('disconnect', (reason) => {
+            console.log('Socket disconnected:', reason);
+            if (reason === 'io server disconnect') {
+                socket.connect();
+            }
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+        });
+        
+        socket.on('reconnect', (attemptNumber) => {
+            console.log('Socket reconnected after', attemptNumber, 'attempts');
+            if (roomCode) {
+                socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+            }
+        });
     }
     
     socket.emit('createRoom', { roomCode: roomCode, gameMode: mode });
@@ -2034,7 +2300,34 @@ function joinRoom() {
     
     if (!socket) {
         const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
-        socket = io(socketUrl);
+        socket = io(socketUrl, {
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5,
+            transports: ['websocket', 'polling']
+        });
+        
+        socket.on('connect', () => {
+            console.log('Socket connected:', socket.id);
+        });
+        
+        socket.on('disconnect', (reason) => {
+            console.log('Socket disconnected:', reason);
+            if (reason === 'io server disconnect') {
+                socket.connect();
+            }
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+        });
+        
+        socket.on('reconnect', (attemptNumber) => {
+            console.log('Socket reconnected after', attemptNumber, 'attempts');
+            if (roomCode) {
+                socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+            }
+        });
     }
     
     socket.emit('joinRoom', { roomCode: inputCode });
@@ -2050,6 +2343,11 @@ function joinRoom() {
             
             const modeText = data.gameMode === '1v1' ? '1v1 (2 Players)' : '3v3 (6 Players)';
             statusDiv.innerHTML = `<p style="color: #4CAF50;">Successfully joined ${modeText} room! Waiting for host to start...</p>`;
+            
+            const joinGameBtn = document.getElementById('joinGameBtn');
+            if (joinGameBtn) {
+                joinGameBtn.style.display = 'none';
+            }
             
             const readyBtn = document.getElementById('readyBtnJoin');
             if (readyBtn) {
@@ -2150,6 +2448,20 @@ function startGame(isMultiplayer = false) {
     currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost, practiceMode);
 }
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+    console.log('Page loaded, starting asset preload...');
+    await preloadGameAssets();
+    console.log('Asset preload complete, showing main menu');
+    
+    const initialLoadingScreen = document.getElementById('initialLoadingScreen');
+    if (initialLoadingScreen) {
+        initialLoadingScreen.style.display = 'none';
+    }
+    
+    const mainMenuVideo = document.querySelector('.main-menu-video');
+    if (mainMenuVideo) {
+        mainMenuVideo.style.display = 'block';
+    }
+    
     showMainMenu();
 });
