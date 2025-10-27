@@ -214,6 +214,8 @@ class MundoKnifeGame3D {
             lastFpsUpdate: performance.now()
         };
         
+        this.lastHealthUpdate = 0;
+        
         this.showLoadingOverlay();
         
         this.loadingTimeout = setTimeout(() => {
@@ -303,35 +305,45 @@ class MundoKnifeGame3D {
 
     hideLoadingOverlay() {
         console.log('hideLoadingOverlay() called, isMultiplayer:', this.isMultiplayer);
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
-        }
         
-        const statusContainer = document.getElementById('playerLoadingStatus');
-        if (statusContainer) {
-            statusContainer.style.display = 'none';
-        }
+        this.renderer.render(this.scene, this.camera);
         
-        const loadingVideo = document.querySelector('#loadingOverlay video');
-        if (loadingVideo) {
-            loadingVideo.pause();
-            loadingVideo.style.display = 'none';
-        }
-        const mainMenuVideo = document.querySelector('.main-menu-video');
-        if (mainMenuVideo) {
-            mainMenuVideo.pause();
-            mainMenuVideo.style.display = 'none';
-        }
-        
-        const gameContainer = document.getElementById('gameContainer');
-        if (gameContainer) {
-            gameContainer.style.display = 'block';
-        }
-        const gameCanvas = document.getElementById('gameCanvas');
-        if (gameCanvas) {
-            gameCanvas.style.display = 'block';
-        }
+        requestAnimationFrame(() => {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.transition = 'opacity 0.5s ease-out';
+                overlay.style.opacity = '0';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    overlay.style.opacity = '1';
+                }, 500);
+            }
+            
+            const statusContainer = document.getElementById('playerLoadingStatus');
+            if (statusContainer) {
+                statusContainer.style.display = 'none';
+            }
+            
+            const loadingVideo = document.querySelector('#loadingOverlay video');
+            if (loadingVideo) {
+                loadingVideo.pause();
+                loadingVideo.style.display = 'none';
+            }
+            const mainMenuVideo = document.querySelector('.main-menu-video');
+            if (mainMenuVideo) {
+                mainMenuVideo.pause();
+                mainMenuVideo.style.display = 'none';
+            }
+            
+            const gameContainer = document.getElementById('gameContainer');
+            if (gameContainer) {
+                gameContainer.style.display = 'block';
+            }
+            const gameCanvas = document.getElementById('gameCanvas');
+            if (gameCanvas) {
+                gameCanvas.style.display = 'block';
+            }
+        });
     }
     
     updateLoadingStatus() {
@@ -1615,18 +1627,25 @@ class MundoKnifeGame3D {
             const healthBar = player.healthBarElement;
             
             if (player.health <= 0) {
-                healthBar.style.opacity = '0';
-                healthBar.style.pointerEvents = 'none';
+                if (healthBar.style.opacity !== '0') {
+                    healthBar.style.opacity = '0';
+                    healthBar.style.pointerEvents = 'none';
+                }
                 return;
             }
             
-            healthBar.style.display = 'flex';
-            healthBar.style.opacity = '1';
-            healthBar.style.pointerEvents = 'auto';
+            if (healthBar.style.display !== 'flex') {
+                healthBar.style.display = 'flex';
+                healthBar.style.opacity = '1';
+                healthBar.style.pointerEvents = 'auto';
+            }
             
-            const segments = healthBar.children;
-            for (let i = 0; i < 5; i++) {
-                segments[i].classList.toggle('lost', i >= player.health);
+            if (player._lastHealth !== player.health) {
+                const segments = healthBar.children;
+                for (let i = 0; i < 5; i++) {
+                    segments[i].classList.toggle('lost', i >= player.health);
+                }
+                player._lastHealth = player.health;
             }
             
             const pos = new THREE.Vector3(
@@ -1639,8 +1658,7 @@ class MundoKnifeGame3D {
             const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
             const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
             
-            healthBar.style.left = (x - 43) + 'px';
-            healthBar.style.top = (y - 10) + 'px';
+            healthBar.style.transform = `translate(${x - 43}px, ${y - 10}px) scale(1.56)`;
         });
     }
 
@@ -1834,36 +1852,39 @@ class MundoKnifeGame3D {
             this.accumulator -= this.fixedDt;
         }
         
-        [...this.team1, ...this.team2].forEach(player => {
-            if (player && player.mixer) {
-                this.updatePlayerAnimation(player, frameTime);
-            }
-        });
-        
-        if (this.gameState.isRunning || this.gameState.countdownActive) {
-            [...this.team1, ...this.team2].forEach(player => {
-                if (player && player.mesh) {
+        const allPlayers = [...this.team1, ...this.team2];
+        allPlayers.forEach(player => {
+            if (player) {
+                if (player.mixer) {
+                    this.updatePlayerAnimation(player, frameTime);
+                }
+                if ((this.gameState.isRunning || this.gameState.countdownActive) && player.mesh) {
                     player.mesh.position.x = player.x;
                     player.mesh.position.z = player.z;
                     player.mesh.rotation.y = player.rotation;
                 }
-            });
-        }
+            }
+        });
         
         this.updateCooldownDisplay();
-        this.updateHealthDisplay();
+        if (currentTime - this.lastHealthUpdate >= 100) {
+            this.updateHealthDisplay();
+            this.lastHealthUpdate = currentTime;
+        }
         this.renderer.render(this.scene, this.camera);
         
-        this.fpsData.frames++;
-        if (currentTime - this.fpsData.lastFpsUpdate >= 500) {
-            const elapsed = currentTime - this.fpsData.lastFpsUpdate;
-            const fps = Math.round((this.fpsData.frames * 1000) / elapsed);
-            const fpsElement = document.getElementById('fpsValue');
-            if (fpsElement) {
-                fpsElement.textContent = fps;
+        if (window.DEBUG_MODE) {
+            this.fpsData.frames++;
+            if (currentTime - this.fpsData.lastFpsUpdate >= 500) {
+                const elapsed = currentTime - this.fpsData.lastFpsUpdate;
+                const fps = Math.round((this.fpsData.frames * 1000) / elapsed);
+                const fpsElement = document.getElementById('fpsValue');
+                if (fpsElement) {
+                    fpsElement.textContent = fps;
+                }
+                this.fpsData.frames = 0;
+                this.fpsData.lastFpsUpdate = currentTime;
             }
-            this.fpsData.frames = 0;
-            this.fpsData.lastFpsUpdate = currentTime;
         }
         
         this.gameLoopId = requestAnimationFrame(() => this.gameLoop());
