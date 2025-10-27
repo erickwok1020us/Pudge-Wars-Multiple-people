@@ -74,8 +74,7 @@ async function preloadGameAssets() {
             powerPreference: "high-performance"
         });
         preloadedAssets.renderer.setSize(window.innerWidth, window.innerHeight);
-        preloadedAssets.renderer.shadowMap.enabled = true;
-        preloadedAssets.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        preloadedAssets.renderer.shadowMap.enabled = false;
         
         preloadedAssets.camera = new THREE.PerspectiveCamera(
             75,
@@ -91,21 +90,13 @@ async function preloadGameAssets() {
         updateInitialLoadingProgress(70, 'Setting up lighting...', 'Creating ambient and directional lights...');
         await new Promise(resolve => setTimeout(resolve, 50));
         
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
         preloadedAssets.scene.add(ambientLight);
         preloadedAssets.lights.push(ambientLight);
         
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
         directionalLight.position.set(10, 20, 10);
-        directionalLight.castShadow = true;
-        directionalLight.shadow.mapSize.width = 2048;
-        directionalLight.shadow.mapSize.height = 2048;
-        directionalLight.shadow.camera.near = 0.5;
-        directionalLight.shadow.camera.far = 50;
-        directionalLight.shadow.camera.left = -30;
-        directionalLight.shadow.camera.right = 30;
-        directionalLight.shadow.camera.top = 30;
-        directionalLight.shadow.camera.bottom = -30;
+        directionalLight.castShadow = false;
         preloadedAssets.scene.add(directionalLight);
         preloadedAssets.lights.push(directionalLight);
         
