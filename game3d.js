@@ -66,7 +66,7 @@ async function preloadGameAssets() {
         await new Promise(resolve => setTimeout(resolve, 50)); // Allow UI update
         
         preloadedAssets.scene = new THREE.Scene();
-        preloadedAssets.scene.background = new THREE.Color(0x87CEEB);
+        preloadedAssets.scene.background = new THREE.Color(0x000000);
         
         preloadedAssets.renderer = new THREE.WebGLRenderer({ 
             antialias: true,
@@ -111,50 +111,68 @@ async function preloadGameAssets() {
         
         console.log('Lighting setup complete');
         
-        updateInitialLoadingProgress(80, 'Building game terrain...', 'Creating ground and river...');
+        updateInitialLoadingProgress(80, 'Building game terrain...', 'Loading 3D map model...');
         await new Promise(resolve => setTimeout(resolve, 50));
         
-        const groundGeometry = new THREE.PlaneGeometry(100, 100);
-        const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x2d5016,
-            roughness: 0.8,
-            metalness: 0.2
+        const gltfLoader = new THREE.GLTFLoader();
+        await new Promise((resolve, reject) => {
+            gltfLoader.load(`${CDN_BASE_URL}/new_map.glb`, (gltf) => {
+                const mapModel = gltf.scene;
+                
+                const box = new THREE.Box3().setFromObject(mapModel);
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                
+                const scaleX = 200 / size.x;
+                const scaleZ = 150 / size.z;
+                const uniformScale = Math.min(scaleX, scaleZ);
+                
+                mapModel.scale.set(uniformScale, uniformScale, uniformScale);
+                mapModel.rotation.y = Math.PI / 2;
+                mapModel.position.y = 0;
+                
+                mapModel.traverse((child) => {
+                    if (child.isMesh) {
+                        if (child.name === 'Mesh_0' && child.material) {
+                            child.material.color.set(0x4db8ff);
+                            child.material.needsUpdate = true;
+                        }
+                    }
+                });
+                
+                preloadedAssets.scene.add(mapModel);
+                
+                const scaledBox = new THREE.Box3().setFromObject(mapModel);
+                const scaledSize = new THREE.Vector3();
+                scaledBox.getSize(scaledSize);
+                
+                const groundSurfaceY = scaledBox.max.y;
+                
+                const invisibleGroundGeometry = new THREE.PlaneGeometry(500, 500);
+                const invisibleGroundMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0x000000, 
+                    transparent: true, 
+                    opacity: 0,
+                    side: THREE.DoubleSide
+                });
+                const invisibleGround = new THREE.Mesh(invisibleGroundGeometry, invisibleGroundMaterial);
+                invisibleGround.rotation.x = -Math.PI / 2;
+                invisibleGround.position.y = groundSurfaceY;
+                preloadedAssets.scene.add(invisibleGround);
+                
+                preloadedAssets.terrain = {
+                    ground: mapModel,
+                    invisibleGround: invisibleGround,
+                    groundSurfaceY: groundSurfaceY
+                };
+                
+                console.log('3D map model loaded and added to scene');
+                resolve();
+            }, undefined, (error) => {
+                console.error('Error loading GLB map during preload:', error);
+                reject(error);
+            });
         });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        preloadedAssets.scene.add(ground);
-        
-        const riverGeometry = new THREE.PlaneGeometry(100, 4);
-        const riverMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x4a90e2,
-            roughness: 0.3,
-            metalness: 0.5,
-            transparent: true,
-            opacity: 0.8
-        });
-        const river = new THREE.Mesh(riverGeometry, riverMaterial);
-        river.rotation.x = -Math.PI / 2;
-        river.position.y = 0.01;
-        river.receiveShadow = true;
-        preloadedAssets.scene.add(river);
-        
-        const invisibleGroundGeometry = new THREE.PlaneGeometry(100, 100);
-        const invisibleGroundMaterial = new THREE.MeshBasicMaterial({ 
-            visible: false
-        });
-        const invisibleGround = new THREE.Mesh(invisibleGroundGeometry, invisibleGroundMaterial);
-        invisibleGround.rotation.x = -Math.PI / 2;
-        invisibleGround.position.y = 0;
-        preloadedAssets.scene.add(invisibleGround);
-        
-        preloadedAssets.terrain = {
-            ground,
-            river,
-            invisibleGround
-        };
-        
-        console.log('Terrain created');
         
         updateInitialLoadingProgress(100, 'Ready to play!', 'All assets loaded successfully');
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -220,6 +238,13 @@ class MundoKnifeGame3D {
             const canvas = document.getElementById('gameCanvas');
             if (canvas && !canvas.firstChild) {
                 canvas.appendChild(this.renderer.domElement);
+            }
+            
+            if (preloadedAssets.terrain) {
+                console.log('Using preloaded terrain');
+                this.ground = preloadedAssets.terrain.ground;
+                this.invisibleGround = preloadedAssets.terrain.invisibleGround;
+                this.groundSurfaceY = preloadedAssets.terrain.groundSurfaceY;
             }
         } else {
             console.log('Preloaded assets not available, creating new scene');
@@ -632,7 +657,7 @@ class MundoKnifeGame3D {
                 z: pos.z,
                 health: 5,
                 maxHealth: 5,
-                color: index === 0 ? 0x9370DB : 0x6A5ACD,
+                color: 0xFFFFFF,
                 facing: pos.facing,
                 rotation: 0,
                 isMoving: false,
@@ -671,7 +696,7 @@ class MundoKnifeGame3D {
                 z: pos.z,
                 health: 5,
                 maxHealth: 5,
-                color: 0xFF6347,
+                color: 0xFFFFFF,
                 facing: pos.facing,
                 rotation: 0,
                 isMoving: false,
@@ -772,13 +797,16 @@ class MundoKnifeGame3D {
             if (child.isMesh) {
                 if (child.material) {
                     if (Array.isArray(child.material)) {
-                        child.material.forEach((mat) => {
-                            mat.color.set(player.color);
-                            mat.roughness = 0.95;
-                            mat.metalness = 0.05;
-                            mat.needsUpdate = true;
+                        child.material = child.material.map(mat => {
+                            const newMat = mat.clone();
+                            newMat.color.set(player.color);
+                            newMat.roughness = 0.95;
+                            newMat.metalness = 0.05;
+                            newMat.needsUpdate = true;
+                            return newMat;
                         });
                     } else {
+                        child.material = child.material.clone();
                         child.material.color.set(player.color);
                         child.material.roughness = 0.95;
                         child.material.metalness = 0.05;
