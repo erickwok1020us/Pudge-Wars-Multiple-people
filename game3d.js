@@ -793,23 +793,6 @@ class MundoKnifeGame3D {
         player.y = groundY;
         player.mesh.castShadow = false;
         
-        player.mesh.traverse((child) => {
-            if (child.isMesh) {
-                if (child.material) {
-                    if (Array.isArray(child.material)) {
-                        child.material.forEach((mat) => {
-                            mat.roughness = 0.95;
-                            mat.metalness = 0.05;
-                            mat.needsUpdate = true;
-                        });
-                    } else {
-                        child.material.roughness = 0.95;
-                        child.material.metalness = 0.05;
-                        child.material.needsUpdate = true;
-                    }
-                }
-            }
-        });
         
         player.mixer = new THREE.AnimationMixer(player.mesh);
         player.currentAnimation = null;
