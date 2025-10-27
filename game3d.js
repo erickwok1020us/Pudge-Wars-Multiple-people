@@ -52,9 +52,11 @@ class MundoKnifeGame3D {
             }
             
             if (this.isMultiplayer && socket && roomCode) {
+                console.log('Emitting playerLoaded event for room:', roomCode);
                 socket.emit('playerLoaded', { roomCode });
                 this.updateLoadingStatus();
             } else {
+                console.log('Single player mode or missing socket/roomCode, hiding loading overlay');
                 this.hideLoadingOverlay();
             }
         }).catch(error => {
@@ -70,9 +72,11 @@ class MundoKnifeGame3D {
             }
             
             if (this.isMultiplayer && socket && roomCode) {
+                console.log('Emitting playerLoaded event for room:', roomCode);
                 socket.emit('playerLoaded', { roomCode });
                 this.updateLoadingStatus();
             } else {
+                console.log('Single player mode or missing socket/roomCode, hiding loading overlay');
                 this.hideLoadingOverlay();
             }
         });
@@ -1584,6 +1588,7 @@ class MundoKnifeGame3D {
         });
         
         socket.on('playerLoadUpdate', (playerLoadStatus) => {
+            console.log('Received playerLoadUpdate:', playerLoadStatus);
             const statusContainer = document.getElementById('playerLoadingStatus');
             if (!statusContainer) return;
             
@@ -1954,7 +1959,34 @@ function selectMultiplayerMode(mode) {
     
     if (!socket) {
         const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
-        socket = io(socketUrl);
+        socket = io(socketUrl, {
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5,
+            transports: ['websocket', 'polling']
+        });
+        
+        socket.on('connect', () => {
+            console.log('Socket connected:', socket.id);
+        });
+        
+        socket.on('disconnect', (reason) => {
+            console.log('Socket disconnected:', reason);
+            if (reason === 'io server disconnect') {
+                socket.connect();
+            }
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+        });
+        
+        socket.on('reconnect', (attemptNumber) => {
+            console.log('Socket reconnected after', attemptNumber, 'attempts');
+            if (roomCode) {
+                socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+            }
+        });
     }
     
     socket.emit('createRoom', { roomCode: roomCode, gameMode: mode });
@@ -2037,7 +2069,34 @@ function joinRoom() {
     
     if (!socket) {
         const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
-        socket = io(socketUrl);
+        socket = io(socketUrl, {
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5,
+            transports: ['websocket', 'polling']
+        });
+        
+        socket.on('connect', () => {
+            console.log('Socket connected:', socket.id);
+        });
+        
+        socket.on('disconnect', (reason) => {
+            console.log('Socket disconnected:', reason);
+            if (reason === 'io server disconnect') {
+                socket.connect();
+            }
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+        });
+        
+        socket.on('reconnect', (attemptNumber) => {
+            console.log('Socket reconnected after', attemptNumber, 'attempts');
+            if (roomCode) {
+                socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+            }
+        });
     }
     
     socket.emit('joinRoom', { roomCode: inputCode });
