@@ -87,6 +87,13 @@ class MundoKnifeGame3D {
         if (overlay) {
             overlay.style.display = 'flex';
         }
+        
+        if (this.isMultiplayer) {
+            const statusContainer = document.getElementById('playerLoadingStatus');
+            if (statusContainer) {
+                statusContainer.style.display = 'block';
+            }
+        }
     }
 
     hideLoadingOverlay() {
@@ -94,6 +101,12 @@ class MundoKnifeGame3D {
         if (overlay) {
             overlay.style.display = 'none';
         }
+        
+        const statusContainer = document.getElementById('playerLoadingStatus');
+        if (statusContainer) {
+            statusContainer.style.display = 'none';
+        }
+        
         const loadingVideo = document.querySelector('#loadingOverlay video');
         if (loadingVideo) {
             loadingVideo.pause();
@@ -510,7 +523,11 @@ class MundoKnifeGame3D {
         this.setupCamera();
         this.createHealthBarElements();
         this.updateHealthDisplay();
-        this.startCountdown();
+        
+        if (!this.isMultiplayer) {
+            this.startCountdown();
+        }
+        
         this.startLatencyMeasurement();
     }
 
@@ -1598,18 +1615,12 @@ class MundoKnifeGame3D {
         
         while (this.accumulator >= this.fixedDt) {
             if (this.gameState.isRunning || this.gameState.countdownActive) {
-                if (this.isMultiplayer) {
-                    this.previousState = this.cloneGameState();
-                }
                 this.updatePlayers(this.fixedDt);
                 this.updateCamera();
                 if (this.gameState.isRunning) {
                     this.throwKnife();
                     this.updateKnives(this.fixedDt);
                     this.updateParticles();
-                }
-                if (this.isMultiplayer) {
-                    this.currentState = this.cloneGameState();
                 }
             }
             this.accumulator -= this.fixedDt;
@@ -1622,21 +1633,13 @@ class MundoKnifeGame3D {
         });
         
         if (this.gameState.isRunning || this.gameState.countdownActive) {
-            if (this.isMultiplayer && this.previousState && this.currentState) {
-                const alpha = this.accumulator / this.fixedDt;
-                this.interpolateStates(alpha);
-            } else if (!this.isMultiplayer) {
-                [...this.team1, ...this.team2].forEach(player => {
-                    if (player && player.mesh) {
-                        player.mesh.position.x = player.x;
-                        player.mesh.position.z = player.z;
-                        player.mesh.rotation.y = player.rotation;
-                    }
-                });
-                
-                this.knives.forEach(knife => {
-                });
-            }
+            [...this.team1, ...this.team2].forEach(player => {
+                if (player && player.mesh) {
+                    player.mesh.position.x = player.x;
+                    player.mesh.position.z = player.z;
+                    player.mesh.rotation.y = player.rotation;
+                }
+            });
         }
         
         this.updateCooldownDisplay();
