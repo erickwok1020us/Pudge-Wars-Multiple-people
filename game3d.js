@@ -182,11 +182,14 @@ async function preloadGameAssets() {
 }
 
 class MundoKnifeGame3D {
-    constructor(mode = 'practice', isMultiplayer = false, isHostPlayer = false, practiceMode = '1v1') {
+    constructor(mode = 'practice', isMultiplayer = false, isHostPlayer = false, practiceMode = '1v1', myTeamNumber = 1) {
         this.gameMode = mode;
         this.isMultiplayer = isMultiplayer;
         this.isHost = isHostPlayer;
         this.practiceMode = practiceMode;
+        this.myTeam = myTeamNumber;
+        this.opponentTeam = myTeamNumber === 1 ? 2 : 1;
+        console.log('[TEAM] My team:', this.myTeam, 'Opponent team:', this.opponentTeam);
         this.lastTime = performance.now();
         this.accumulator = 0.0;
         this.fixedDt = this.getPlatformAdjustedTimestep();
@@ -731,6 +734,15 @@ class MundoKnifeGame3D {
 
         this.player1 = this.team1[0];
         this.player2 = this.team2[0];
+        
+        if (this.isMultiplayer) {
+            this.playerSelf = this.myTeam === 1 ? this.team1[0] : this.team2[0];
+            this.playerOpponent = this.myTeam === 1 ? this.team2[0] : this.team1[0];
+            console.log('[TEAM] PlayerSelf team:', this.playerSelf.team, 'PlayerOpponent team:', this.playerOpponent.team);
+        } else {
+            this.playerSelf = this.player1;
+            this.playerOpponent = this.player2;
+        }
 
         this.knives = [];
         
@@ -921,18 +933,18 @@ class MundoKnifeGame3D {
     }
 
     setupCamera() {
-        if (this.player1) {
+        if (this.playerSelf) {
             const groundY = this.groundSurfaceY || 0;
             const characterCenterY = groundY + (this.characterSize / 2);
             
             this.camera.position.set(
-                this.player1.x,
+                this.playerSelf.x,
                 characterCenterY + 90,
-                this.player1.z + 75
+                this.playerSelf.z + 75
             );
-            this.camera.lookAt(this.player1.x, characterCenterY, this.player1.z);
+            this.camera.lookAt(this.playerSelf.x, characterCenterY, this.playerSelf.z);
             
-            this.cameraTarget = new THREE.Vector3(this.player1.x, characterCenterY, this.player1.z);
+            this.cameraTarget = new THREE.Vector3(this.playerSelf.x, characterCenterY, this.playerSelf.z);
             this.cameraOffset = new THREE.Vector3(0, 90, 75);
         } else {
             this.camera.position.set(0, 90, 75);
@@ -946,17 +958,17 @@ class MundoKnifeGame3D {
     }
 
     updateCamera() {
-        if (this.player1) {
+        if (this.playerSelf) {
             const groundY = this.groundSurfaceY || 0;
             const characterCenterY = groundY + (this.characterSize / 2);
             
             this.camera.position.set(
-                this.player1.x,
+                this.playerSelf.x,
                 characterCenterY + 90,
-                this.player1.z + 75
+                this.playerSelf.z + 75
             );
             
-            this.camera.lookAt(this.player1.x, characterCenterY, this.player1.z);
+            this.camera.lookAt(this.playerSelf.x, characterCenterY, this.playerSelf.z);
         }
     }
 
@@ -1024,7 +1036,7 @@ class MundoKnifeGame3D {
     }
 
     handlePlayerMovement(event) {
-        if (this.player1.health <= 0) {
+        if (this.playerSelf.health <= 0) {
             return;
         }
         
@@ -1040,15 +1052,15 @@ class MundoKnifeGame3D {
         if (intersects.length > 0) {
             const point = intersects[0].point;
             
-            const boundsCheck = this.isWithinMapBounds(point.x, point.z, this.player1);
+            const boundsCheck = this.isWithinMapBounds(point.x, point.z, this.playerSelf);
             
             if (!boundsCheck) {
                 return;
             }
             
-            this.player1.targetX = point.x;
-            this.player1.targetZ = point.z;
-            this.player1.isMoving = true;
+            this.playerSelf.targetX = point.x;
+            this.playerSelf.targetZ = point.z;
+            this.playerSelf.isMoving = true;
             
             if (this.isMultiplayer && socket) {
                 socket.emit('playerMove', {
@@ -1061,41 +1073,41 @@ class MundoKnifeGame3D {
     }
 
     throwKnifeTowardsMouse() {
-        if (this.player1.health <= 0) {
+        if (this.playerSelf.health <= 0) {
             return;
         }
         
         const now = Date.now();
         
-        if (!this.player1.canAttack) {
+        if (!this.playerSelf.canAttack) {
             return;
         }
         
-        if (now - this.player1.lastKnifeTime >= this.player1.knifeCooldown) {
+        if (now - this.playerSelf.lastKnifeTime >= this.playerSelf.knifeCooldown) {
             let targetX, targetZ;
             
             if (this.mouseWorldX !== undefined && this.mouseWorldZ !== undefined) {
                 targetX = this.mouseWorldX;
                 targetZ = this.mouseWorldZ;
             } else {
-                targetX = this.player1.x + (this.player1.facing * 20);
-                targetZ = this.player1.z;
+                targetX = this.playerSelf.x + (this.playerSelf.facing * 20);
+                targetZ = this.playerSelf.z;
             }
             
             const knifeAudio = new Audio('knife-slice-41231.mp3');
             knifeAudio.volume = 0.4;
             knifeAudio.play().catch(e => {});
             
-            this.createKnife3DTowards(this.player1, targetX, targetZ, this.raycaster.ray.direction, knifeAudio);
+            this.createKnife3DTowards(this.playerSelf, targetX, targetZ, this.raycaster.ray.direction, knifeAudio);
             
-            this.player1.isThrowingKnife = true;
-            this.player1.isMoving = false;
-            this.player1.targetX = null;
-            this.player1.targetZ = null;
-            this.player1.lastKnifeTime = now;
+            this.playerSelf.isThrowingKnife = true;
+            this.playerSelf.isMoving = false;
+            this.playerSelf.targetX = null;
+            this.playerSelf.targetZ = null;
+            this.playerSelf.lastKnifeTime = now;
             
             setTimeout(() => {
-                this.player1.isThrowingKnife = false;
+                this.playerSelf.isThrowingKnife = false;
             }, 2500);
             
             if (this.isMultiplayer && socket) {
@@ -1125,22 +1137,22 @@ class MundoKnifeGame3D {
         }
         
         if (!this.isMultiplayer && this.player2.aiCanAttack && now - this.player2.lastKnifeTime >= this.player2.knifeCooldown) {
-            let targetX = this.player1.x;
-            let targetZ = this.player1.z;
+            let targetX = this.playerSelf.x;
+            let targetZ = this.playerSelf.z;
             
-            if (this.player1.isMoving && this.player1.targetX !== null && this.player1.targetZ !== null) {
-                const dx = this.player1.targetX - this.player1.x;
-                const dz = this.player1.targetZ - this.player1.z;
+            if (this.playerSelf.isMoving && this.playerSelf.targetX !== null && this.playerSelf.targetZ !== null) {
+                const dx = this.playerSelf.targetX - this.playerSelf.x;
+                const dz = this.playerSelf.targetZ - this.playerSelf.z;
                 const distance = Math.sqrt(dx * dx + dz * dz);
                 
                 if (distance > 0.1) {
                     const predictionTime = 0.3;
-                    const predictedDistance = this.player1.moveSpeed * 60 * predictionTime;
+                    const predictedDistance = this.playerSelf.moveSpeed * 60 * predictionTime;
                     const dirX = dx / distance;
                     const dirZ = dz / distance;
                     
-                    targetX = this.player1.x + dirX * Math.min(predictedDistance, distance);
-                    targetZ = this.player1.z + dirZ * Math.min(predictedDistance, distance);
+                    targetX = this.playerSelf.x + dirX * Math.min(predictedDistance, distance);
+                    targetZ = this.playerSelf.z + dirZ * Math.min(predictedDistance, distance);
                 }
             }
             
@@ -1254,14 +1266,19 @@ class MundoKnifeGame3D {
             knifeGroup.position.z + direction.z
         );
         
+        const isLocalKnife = this.isMultiplayer ? (fromPlayer.team === this.myTeam) : true;
+        
         const knifeData = {
             mesh: knifeGroup,
             vx: directionXZ.x * knifeSpeed,
             vz: directionXZ.z * knifeSpeed,
             fromPlayer: fromPlayer === this.player1 ? 1 : 2,
             thrower: fromPlayer,
-            audio: audio
+            audio: audio,
+            ownerIsLocal: isLocalKnife
         };
+        
+        console.log('[KNIFE] Created knife from team', fromPlayer.team, 'ownerIsLocal:', isLocalKnife);
         
         this.knives.push(knifeData);
         this.scene.add(knifeGroup);
@@ -1475,6 +1492,10 @@ class MundoKnifeGame3D {
     }
 
     checkKnifeCollisions(knife, knifeIndex) {
+        if (this.isMultiplayer && !knife.ownerIsLocal) {
+            return;
+        }
+        
         const knifePos = knife.mesh.position;
         
         const thrower = knife.thrower;
@@ -1517,9 +1538,10 @@ class MundoKnifeGame3D {
                 if (this.isMultiplayer && socket) {
                     socket.emit('healthUpdate', {
                         roomCode: roomCode,
-                        playerId: target.team === 1 ? 1 : 2,
+                        targetTeam: target.team,
                         health: target.health
                     });
+                    console.log('[HEALTH] Emitted healthUpdate for team', target.team, 'health:', target.health);
                 }
             }
         });
@@ -1682,9 +1704,9 @@ class MundoKnifeGame3D {
 
     updateCooldownDisplay() {
         const now = Date.now();
-        const timeSinceLastKnife = now - this.player1.lastKnifeTime;
-        const cooldownProgress = Math.min(timeSinceLastKnife / this.player1.knifeCooldown, 1);
-        const remainingTime = Math.max(0, this.player1.knifeCooldown - timeSinceLastKnife) / 1000;
+        const timeSinceLastKnife = now - this.playerSelf.lastKnifeTime;
+        const cooldownProgress = Math.min(timeSinceLastKnife / this.playerSelf.knifeCooldown, 1);
+        const remainingTime = Math.max(0, this.playerSelf.knifeCooldown - timeSinceLastKnife) / 1000;
         
         const cooldownCircle = document.getElementById('cooldownCircle');
         const cooldownTime = document.getElementById('cooldownTime');
@@ -1736,10 +1758,14 @@ class MundoKnifeGame3D {
             loadingVideo.style.display = 'none';
         }
         
-        this.player1.knifeCooldown = 5000;
-        this.player2.knifeCooldown = 5000;
-        this.player1.lastKnifeTime = Date.now();
-        this.player2.lastKnifeTime = Date.now();
+        this.playerSelf.knifeCooldown = 5000;
+        if (this.playerOpponent) {
+            this.playerOpponent.knifeCooldown = 5000;
+        }
+        this.playerSelf.lastKnifeTime = Date.now();
+        if (this.playerOpponent) {
+            this.playerOpponent.lastKnifeTime = Date.now();
+        }
         
         let count = 5;
         countdownNumber.textContent = count;
@@ -1779,16 +1805,20 @@ class MundoKnifeGame3D {
             } else {
                 countdownNumber.textContent = 'FIGHT!';
                 
-                this.player1.knifeCooldown = 2200;
-                this.player2.knifeCooldown = 2200;
+                this.playerSelf.knifeCooldown = 2200;
+                if (this.playerOpponent) {
+                    this.playerOpponent.knifeCooldown = 2200;
+                }
                 
                 setTimeout(() => {
                     countdownOverlay.style.display = 'none';
                     this.gameState.countdownActive = false;
                     this.gameState.isRunning = true;
                     this.gameState.gameStarted = true;
-                    this.player1.canAttack = true;
-                    this.player2.aiCanAttack = true;
+                    this.playerSelf.canAttack = true;
+                    if (this.playerOpponent && this.playerOpponent.isAI) {
+                        this.playerOpponent.aiCanAttack = true;
+                    }
                 }, 500);
                 clearInterval(countdownInterval);
                 clearInterval(aiMovementInterval);
@@ -1800,23 +1830,22 @@ class MundoKnifeGame3D {
         if (!this.isMultiplayer || !socket) return;
         
         socket.on('opponentMove', (data) => {
-            this.player2.targetX = data.targetX;
-            this.player2.targetZ = data.targetZ;
-            this.player2.isMoving = true;
+            this.playerOpponent.targetX = data.targetX;
+            this.playerOpponent.targetZ = data.targetZ;
+            this.playerOpponent.isMoving = true;
         });
         
         socket.on('opponentKnifeThrow', (data) => {
-            this.createKnife3DTowards(this.player2, data.targetX, data.targetZ, null);
-            this.player2.lastKnifeTime = Date.now();
+            this.createKnife3DTowards(this.playerOpponent, data.targetX, data.targetZ, null);
+            this.playerOpponent.lastKnifeTime = Date.now();
         });
         
         socket.on('opponentHealthUpdate', (data) => {
-            if (data.playerId === 1) {
-                this.player1.health = data.health;
-            } else {
-                this.player2.health = data.health;
+            console.log('[HEALTH] Received opponentHealthUpdate for team', data.targetTeam, 'health:', data.health);
+            if (data.targetTeam === this.opponentTeam) {
+                this.playerOpponent.health = data.health;
+                this.updateHealthDisplay();
             }
-            this.updateHealthDisplay();
         });
         
         socket.on('playerLoadUpdate', (playerLoadStatus) => {
@@ -2514,7 +2543,9 @@ function startGame(isMultiplayer = false) {
         mainMenuVideo.style.display = 'none';
     }
     
-    currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost, practiceMode);
+    const myTeamNumber = isHost ? 1 : 2;
+    console.log('[GAME] Creating game with myTeam:', myTeamNumber, 'isHost:', isHost);
+    currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost, practiceMode, myTeamNumber);
 }
 
 window.addEventListener('load', async () => {
