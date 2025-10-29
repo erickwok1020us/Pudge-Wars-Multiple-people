@@ -1567,7 +1567,7 @@ class MundoKnifeGame3D {
             if (distance < threshold) {
                 console.log(`💥 [HIT] Knife hit Team${target.team} Player${target.playerIndex}! Health before: ${target.health}`);
                 
-                this.createBloodEffect(targetPos.x, targetPos.y, targetPos.z);
+                this.createBloodEffect(targetWorldPos.x, targetWorldPos.y, targetWorldPos.z);
                 
                 const hitSound = document.getElementById('hitSound');
                 if (hitSound) {
