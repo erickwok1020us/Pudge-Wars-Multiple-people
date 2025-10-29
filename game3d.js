@@ -563,6 +563,28 @@ class MundoKnifeGame3D {
         return missIndices.sort((a, b) => a - b);
     }
 
+    xmur3(str) {
+        let h = 1779033703 ^ str.length;
+        for (let i = 0; i < str.length; i++) {
+            h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+            h = (h << 13) | (h >>> 19);
+        }
+        return function() {
+            h = Math.imul(h ^ (h >>> 16), 2246822507);
+            h = Math.imul(h ^ (h >>> 13), 3266489909);
+            return (h ^= h >>> 16) >>> 0;
+        };
+    }
+
+    mulberry32(a) {
+        return function() {
+            let t = (a += 0x6D2B79F5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
 
     generateTeamSpawnPositions(mode) {
         const positions = { team1: [], team2: [] };
@@ -572,17 +594,34 @@ class MundoKnifeGame3D {
             const player1Bounds = { xMin: -42, xMax: -25 };
             const player2Bounds = { xMin: 25, xMax: 42 };
             
+            let rng;
+            if (this.isMultiplayer && typeof roomCode !== 'undefined' && roomCode) {
+                const seed = String(roomCode).trim() + ':' + mode;
+                console.log('[SPAWN] Using seeded RNG with seed:', seed);
+                const seedFn = this.xmur3(seed);
+                rng = this.mulberry32(seedFn());
+            } else {
+                rng = Math.random.bind(Math);
+            }
+            
+            const team1X = rng() * (player1Bounds.xMax - player1Bounds.xMin) + player1Bounds.xMin;
+            const team1Z = rng() * (zBounds.zMax - zBounds.zMin) + zBounds.zMin;
+            const team2X = rng() * (player2Bounds.xMax - player2Bounds.xMin) + player2Bounds.xMin;
+            const team2Z = rng() * (zBounds.zMax - zBounds.zMin) + zBounds.zMin;
+            
             positions.team1.push({
-                x: Math.random() * (player1Bounds.xMax - player1Bounds.xMin) + player1Bounds.xMin,
-                z: Math.random() * (zBounds.zMax - zBounds.zMin) + zBounds.zMin,
+                x: team1X,
+                z: team1Z,
                 facing: 1
             });
             
             positions.team2.push({
-                x: Math.random() * (player2Bounds.xMax - player2Bounds.xMin) + player2Bounds.xMin,
-                z: Math.random() * (zBounds.zMax - zBounds.zMin) + zBounds.zMin,
+                x: team2X,
+                z: team2Z,
                 facing: -1
             });
+            
+            console.log('[SPAWN] Generated positions - Team1:', { x: team1X.toFixed(2), z: team1Z.toFixed(2) }, 'Team2:', { x: team2X.toFixed(2), z: team2Z.toFixed(2) });
         } else if (mode === '3v3') {
             const team1BaseX = -35;
             const team2BaseX = 35;
@@ -1536,12 +1575,14 @@ class MundoKnifeGame3D {
                 }
                 
                 if (this.isMultiplayer && socket) {
-                    socket.emit('healthUpdate', {
+                    const healthData = {
                         roomCode: roomCode,
                         targetTeam: target.team,
                         health: target.health
-                    });
-                    console.log('[HEALTH] Emitted healthUpdate for team', target.team, 'health:', target.health);
+                    };
+                    socket.emit('healthUpdate', healthData);
+                    socket.emit('playerHealthUpdate', healthData);
+                    console.log('[HEALTH] Dual-emitted healthUpdate & playerHealthUpdate for team', target.team, 'health:', target.health);
                 }
             }
         });
@@ -1841,10 +1882,50 @@ class MundoKnifeGame3D {
         });
         
         socket.on('opponentHealthUpdate', (data) => {
-            console.log('[HEALTH] Received opponentHealthUpdate for team', data.targetTeam, 'health:', data.health);
-            if (data.targetTeam === this.opponentTeam) {
+            console.log('[HEALTH] Received opponentHealthUpdate - myTeam:', this.myTeam, 'opponentTeam:', this.opponentTeam, 'targetTeam:', data.targetTeam, 'health:', data.health);
+            
+            if (data.targetTeam === this.myTeam) {
+                console.log('[HEALTH] Updating playerSelf health to', data.health);
+                this.playerSelf.health = data.health;
+                this.updateHealthDisplay();
+                
+                if (this.playerSelf.health <= 0) {
+                    console.log('☠️ [DEATH] PlayerSelf has died');
+                    this.handlePlayerDeath(this.playerSelf);
+                }
+            } else if (data.targetTeam === this.opponentTeam) {
+                console.log('[HEALTH] Updating playerOpponent health to', data.health);
                 this.playerOpponent.health = data.health;
                 this.updateHealthDisplay();
+                
+                if (this.playerOpponent.health <= 0) {
+                    console.log('☠️ [DEATH] PlayerOpponent has died');
+                    this.handlePlayerDeath(this.playerOpponent);
+                }
+            }
+        });
+        
+        socket.on('healthUpdate', (data) => {
+            console.log('[HEALTH] Received healthUpdate (fallback) - myTeam:', this.myTeam, 'opponentTeam:', this.opponentTeam, 'targetTeam:', data.targetTeam, 'health:', data.health);
+            
+            if (data.targetTeam === this.myTeam) {
+                console.log('[HEALTH] Updating playerSelf health to', data.health);
+                this.playerSelf.health = data.health;
+                this.updateHealthDisplay();
+                
+                if (this.playerSelf.health <= 0) {
+                    console.log('☠️ [DEATH] PlayerSelf has died');
+                    this.handlePlayerDeath(this.playerSelf);
+                }
+            } else if (data.targetTeam === this.opponentTeam) {
+                console.log('[HEALTH] Updating playerOpponent health to', data.health);
+                this.playerOpponent.health = data.health;
+                this.updateHealthDisplay();
+                
+                if (this.playerOpponent.health <= 0) {
+                    console.log('☠️ [DEATH] PlayerOpponent has died');
+                    this.handlePlayerDeath(this.playerOpponent);
+                }
             }
         });
         
