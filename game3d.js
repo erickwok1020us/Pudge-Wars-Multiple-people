@@ -1532,25 +1532,39 @@ class MundoKnifeGame3D {
 
     checkKnifeCollisions(knife, knifeIndex) {
         if (this.isMultiplayer && !knife.ownerIsLocal) {
+            console.log('[COLLISION] Skipping collision check for non-local knife');
             return;
         }
         
-        const knifePos = knife.mesh.position;
+        const knifeWorldPos = new THREE.Vector3();
+        knife.mesh.getWorldPosition(knifeWorldPos);
         
         const thrower = knife.thrower;
         const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
         
+        console.log('[COLLISION] Checking knife from team', thrower.team, 'against', targetTeam.length, 'targets in team', targetTeam[0]?.team);
+        
         targetTeam.forEach(target => {
             if (target.health <= 0) return;
             
-            const targetPos = target.mesh ? target.mesh.position : { x: target.x, y: target.y, z: target.z };
+            const targetWorldPos = new THREE.Vector3();
+            if (target.mesh) {
+                target.mesh.getWorldPosition(targetWorldPos);
+            } else {
+                targetWorldPos.set(target.x, target.y, target.z);
+            }
             
             const distance = Math.sqrt(
-                Math.pow(knifePos.x - targetPos.x, 2) + 
-                Math.pow(knifePos.z - targetPos.z, 2)
+                Math.pow(knifeWorldPos.x - targetWorldPos.x, 2) + 
+                Math.pow(knifeWorldPos.z - targetWorldPos.z, 2)
             );
             
-            if (distance < this.characterSize * 1.05) {
+            const threshold = this.characterSize * 1.05;
+            console.log('[COLLISION] Knife at', knifeWorldPos.x.toFixed(2), knifeWorldPos.z.toFixed(2), 
+                       'vs Target at', targetWorldPos.x.toFixed(2), targetWorldPos.z.toFixed(2), 
+                       'distance:', distance.toFixed(2), 'threshold:', threshold.toFixed(2));
+            
+            if (distance < threshold) {
                 console.log(`💥 [HIT] Knife hit Team${target.team} Player${target.playerIndex}! Health before: ${target.health}`);
                 
                 this.createBloodEffect(targetPos.x, targetPos.y, targetPos.z);
