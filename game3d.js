@@ -1532,18 +1532,20 @@ class MundoKnifeGame3D {
     }
 
     checkKnifeCollisions(knife, knifeIndex) {
-        if (this.isMultiplayer && !knife.ownerIsLocal) {
-            return;
-        }
-        
         const knifeWorldPos = new THREE.Vector3();
         knife.mesh.getWorldPosition(knifeWorldPos);
         
         const thrower = knife.thrower;
         const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
         
+        const isLocalKnife = !this.isMultiplayer || knife.ownerIsLocal;
+        
         targetTeam.forEach(target => {
             if (target.health <= 0) return;
+            
+            if (!isLocalKnife && target.team !== this.myTeam) {
+                return;
+            }
             
             const targetWorldPos = new THREE.Vector3();
             if (target.mesh) {
@@ -1560,7 +1562,8 @@ class MundoKnifeGame3D {
             const threshold = this.characterSize * 1.05;
             
             if (distance < threshold) {
-                console.log(`💥 [HIT] Knife hit Team${target.team} Player${target.playerIndex}! Health before: ${target.health}`);
+                const knifeSource = isLocalKnife ? 'LOCAL' : 'REMOTE';
+                console.log(`💥 [HIT-${knifeSource}] Knife from Team${thrower.team} hit Team${target.team} Player${target.playerIndex}! Health before: ${target.health}`);
                 
                 this.createBloodEffect(targetWorldPos.x, targetWorldPos.y, targetWorldPos.z);
                 
@@ -1583,15 +1586,15 @@ class MundoKnifeGame3D {
                     this.handlePlayerDeath(target);
                 }
                 
-                if (this.isMultiplayer && socket) {
+                if (isLocalKnife && this.isMultiplayer && socket) {
                     const healthData = {
                         roomCode: roomCode,
                         targetTeam: target.team,
                         health: target.health
                     };
+                    console.log('[HEALTH-EMIT] Emitting health update - roomCode:', roomCode, 'targetTeam:', target.team, 'health:', target.health);
                     socket.emit('healthUpdate', healthData);
                     socket.emit('playerHealthUpdate', healthData);
-                    console.log('[HEALTH] Dual-emitted healthUpdate & playerHealthUpdate for team', target.team, 'health:', target.health);
                 }
             }
         });
