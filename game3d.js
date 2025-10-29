@@ -651,6 +651,10 @@ class MundoKnifeGame3D {
         this.team1 = [];
         this.team2 = [];
         
+        this.playersRoot = new THREE.Group();
+        this.playersRoot.name = 'playersRoot';
+        this.scene.add(this.playersRoot);
+        
         spawnPositions.team1.forEach((pos, index) => {
             const player = {
                 x: pos.x,
@@ -811,7 +815,7 @@ class MundoKnifeGame3D {
         player.animations.idle.play();
         player.currentAnimation = player.animations.idle;
         
-        this.scene.add(player.mesh);
+        this.playersRoot.add(player.mesh);
         player.mesh.visible = true;
     }
 
@@ -825,7 +829,7 @@ class MundoKnifeGame3D {
         player.y = groundY;
         player.mesh.rotation.y = player.facing === 1 ? Math.PI / 2 : -Math.PI / 2;
         
-        this.scene.add(player.mesh);
+        this.playersRoot.add(player.mesh);
         player.mesh.visible = true;
         
         if (this.knifeSpawnHeight === null) {
@@ -1112,6 +1116,14 @@ class MundoKnifeGame3D {
             return;
         }
         
+        if (this.practiceMode !== '1v1') {
+            return;
+        }
+        
+        if (this.player2.health <= 0) {
+            return;
+        }
+        
         if (!this.isMultiplayer && this.player2.aiCanAttack && now - this.player2.lastKnifeTime >= this.player2.knifeCooldown) {
             let targetX = this.player1.x;
             let targetZ = this.player1.z;
@@ -1171,6 +1183,10 @@ class MundoKnifeGame3D {
     }
 
     createKnife3DTowards(fromPlayer, targetX, targetZ, rayDirection = null, audio = null) {
+        if (!fromPlayer || fromPlayer.health <= 0) {
+            return;
+        }
+        
         const knifeGroup = new THREE.Group();
         
         const bladeGeometry = new THREE.BoxGeometry(0.3, 6, 1.2);
@@ -1542,6 +1558,9 @@ class MundoKnifeGame3D {
 
     handlePlayerDeath(player) {
         console.log(`☠️ [DEATH] Team${player.team} Player${player.playerIndex} died`);
+        
+        player.aiCanAttack = false;
+        player.isThrowingKnife = false;
         
         const team = player.team === 1 ? this.team1 : this.team2;
         const aliveCount = team.filter(p => p.health > 0).length;
@@ -1974,6 +1993,7 @@ class MundoKnifeGame3D {
     }
 
     dispose() {
+        console.log('[DISPOSE] Cleaning up game instance');
         this.gameState.isRunning = false;
         this.stopLatencyMeasurement();
         
@@ -2002,16 +2022,30 @@ class MundoKnifeGame3D {
         
         this.hideLoadingOverlay();
         
+        if (this.playersRoot) {
+            console.log('[DISPOSE] Removing playersRoot group');
+            this.scene.remove(this.playersRoot);
+            this.playersRoot.children.forEach(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(material => material.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+            this.playersRoot.clear();
+        }
+        
         if (this.team1) {
             this.team1.forEach(player => {
                 if (player.mixer) player.mixer.stopAllAction();
-                if (player.mesh) this.scene.remove(player.mesh);
             });
         }
         if (this.team2) {
             this.team2.forEach(player => {
                 if (player.mixer) player.mixer.stopAllAction();
-                if (player.mesh) this.scene.remove(player.mesh);
             });
         }
         
@@ -2045,11 +2079,15 @@ class MundoKnifeGame3D {
 }
 
 function restartGame() {
+    console.log('[RESTART] Restarting game');
     document.getElementById('gameOverOverlay').style.display = 'none';
     if (gameMode === 'practice') {
         if (currentGame) {
             currentGame.dispose();
+            currentGame = null;
         }
+        window.__gameStarted = false;
+        window.__mpStarting = false;
         startPractice(practiceMode);
     } else {
         showMainMenu();
@@ -2057,10 +2095,15 @@ function restartGame() {
 }
 
 function returnToMainMenu() {
+    console.log('[MENU] Returning to main menu');
     document.getElementById('gameOverOverlay').style.display = 'none';
     if (currentGame) {
         currentGame.dispose();
+        currentGame = null;
     }
+    
+    window.__gameStarted = false;
+    window.__mpStarting = false;
     
     const mainMenuVideo = document.querySelector('.main-menu-video');
     if (mainMenuVideo) {
@@ -2204,11 +2247,13 @@ function selectMultiplayerMode(mode) {
     
     socket.emit('createRoom', { roomCode: roomCode, gameMode: mode });
     
-    socket.on('roomCreated', (data) => {
+    socket.off('roomCreated');
+    socket.once('roomCreated', (data) => {
         myPlayerId = data.playerId;
-        console.log('Room created, playerId:', myPlayerId, 'mode:', mode);
+        console.log('[MP] Room created, playerId:', myPlayerId, 'mode:', mode);
     });
     
+    socket.off('playerJoined');
     socket.on('playerJoined', (data) => {
         if (data.roomCode === roomCode) {
             const { playerId } = data;
@@ -2221,6 +2266,7 @@ function selectMultiplayerMode(mode) {
         }
     });
     
+    socket.off('playerReadyUpdate');
     socket.on('playerReadyUpdate', (data) => {
         const { playerId, ready } = data;
         
@@ -2235,7 +2281,9 @@ function selectMultiplayerMode(mode) {
         updateStartButtonState();
     });
     
-    socket.on('gameStart', () => {
+    socket.off('gameStart');
+    socket.once('gameStart', () => {
+        console.log('[MP] gameStart event received (host)');
         startMultiplayerGame();
     });
     
@@ -2314,7 +2362,8 @@ function joinRoom() {
     
     socket.emit('joinRoom', { roomCode: inputCode });
     
-    socket.on('joinSuccess', (data) => {
+    socket.off('joinSuccess');
+    socket.once('joinSuccess', (data) => {
         if (data.roomCode === inputCode) {
             roomCode = inputCode;
             isHost = false;
@@ -2338,6 +2387,7 @@ function joinRoom() {
         }
     });
     
+    socket.off('playerReadyUpdate');
     socket.on('playerReadyUpdate', (data) => {
         const { playerId, ready } = data;
         
@@ -2346,16 +2396,20 @@ function joinRoom() {
         }
     });
     
-    socket.on('gameStart', () => {
+    socket.off('gameStart');
+    socket.once('gameStart', () => {
+        console.log('[MP] gameStart event received (guest)');
         startMultiplayerGame();
     });
     
-    socket.on('joinError', (data) => {
+    socket.off('joinError');
+    socket.once('joinError', (data) => {
         statusDiv.innerHTML = '<p style="color: #ff4444;">Room code does not exist, please try again</p>';
         document.getElementById('roomCodeInput').value = '';
     });
     
-    socket.on('roomFull', (data) => {
+    socket.off('roomFull');
+    socket.once('roomFull', (data) => {
         statusDiv.innerHTML = '<p style="color: #ff4444;">Room is full, please try another room code</p>';
         document.getElementById('roomCodeInput').value = '';
     });
@@ -2369,10 +2423,29 @@ function startPractice(mode = '1v1') {
 }
 
 function startMultiplayerGame() {
+    console.log('[MP] startMultiplayerGame called, isHost:', isHost, 'currentGame:', !!currentGame);
+    
+    if (currentGame) {
+        console.warn('[MP] Game already started, ignoring duplicate start');
+        return;
+    }
+    
+    if (window.__mpStarting) {
+        console.warn('[MP] Game start already in progress, ignoring duplicate');
+        return;
+    }
+    
+    window.__mpStarting = true;
+    
     if (isHost && socket && roomCode) {
         socket.emit('startGame', { roomCode });
     }
+    
     startGame(true);
+    
+    setTimeout(() => {
+        window.__mpStarting = false;
+    }, 1000);
 }
 
 function toggleReady() {
@@ -2415,6 +2488,20 @@ function updateStartButtonState() {
 }
 
 function startGame(isMultiplayer = false) {
+    console.log('[GAME] startGame called, isMultiplayer:', isMultiplayer, 'currentGame exists:', !!currentGame);
+    
+    if (currentGame) {
+        console.warn('[GAME] Game already exists, not creating new instance');
+        return;
+    }
+    
+    if (window.__gameStarted) {
+        console.warn('[GAME] Game already started globally, not creating new instance');
+        return;
+    }
+    
+    window.__gameStarted = true;
+    
     document.getElementById('mainMenu').style.display = 'none';
     document.getElementById('modeSelectionInterface').style.display = 'none';
     document.getElementById('createRoomInterface').style.display = 'none';
