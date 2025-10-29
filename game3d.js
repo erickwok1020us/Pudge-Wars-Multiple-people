@@ -1532,7 +1532,6 @@ class MundoKnifeGame3D {
 
     checkKnifeCollisions(knife, knifeIndex) {
         if (this.isMultiplayer && !knife.ownerIsLocal) {
-            console.log('[COLLISION] Skipping collision check for non-local knife');
             return;
         }
         
@@ -1541,8 +1540,6 @@ class MundoKnifeGame3D {
         
         const thrower = knife.thrower;
         const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
-        
-        console.log('[COLLISION] Checking knife from team', thrower.team, 'against', targetTeam.length, 'targets in team', targetTeam[0]?.team);
         
         targetTeam.forEach(target => {
             if (target.health <= 0) return;
@@ -1560,9 +1557,6 @@ class MundoKnifeGame3D {
             );
             
             const threshold = this.characterSize * 1.05;
-            console.log('[COLLISION] Knife at', knifeWorldPos.x.toFixed(2), knifeWorldPos.z.toFixed(2), 
-                       'vs Target at', targetWorldPos.x.toFixed(2), targetWorldPos.z.toFixed(2), 
-                       'distance:', distance.toFixed(2), 'threshold:', threshold.toFixed(2));
             
             if (distance < threshold) {
                 console.log(`💥 [HIT] Knife hit Team${target.team} Player${target.playerIndex}! Health before: ${target.health}`);
@@ -1651,6 +1645,11 @@ class MundoKnifeGame3D {
     endGame(winnerId) {
         console.log(`🏁 [GAME END] Team ${winnerId} wins!`);
         
+        if (this.gameState.winner !== null) {
+            console.log('[GAME END] Game already ended, skipping');
+            return;
+        }
+        
         this.gameState.isRunning = false;
         this.gameState.winner = winnerId;
         
@@ -1662,7 +1661,9 @@ class MundoKnifeGame3D {
         
         this.updateKillCountDisplay();
         
-        if (winnerId === 1) {
+        const didIWin = this.isMultiplayer ? (winnerId === this.myTeam) : (winnerId === 1);
+        
+        if (didIWin) {
             const victorySound = document.getElementById('victorySound');
             if (victorySound) {
                 victorySound.currentTime = 0;
@@ -1680,11 +1681,11 @@ class MundoKnifeGame3D {
         const title = document.getElementById('gameOverTitle');
         const message = document.getElementById('gameOverMessage');
         
-        title.textContent = winnerId === 1 ? 'You Win!' : 'You Lose';
+        title.textContent = didIWin ? 'You Win!' : 'You Lose';
         if (this.gameMode === 'practice') {
-            message.textContent = winnerId === 1 ? 'Victory! Choose an option below' : 'Defeated! Choose an option below';
+            message.textContent = didIWin ? 'Victory! Choose an option below' : 'Defeated! Choose an option below';
         } else {
-            message.textContent = winnerId === 1 ? 'Victory!' : 'Defeated!';
+            message.textContent = didIWin ? 'Victory!' : 'Defeated!';
         }
         overlay.style.display = 'flex';
         overlay.style.background = 'transparent';
