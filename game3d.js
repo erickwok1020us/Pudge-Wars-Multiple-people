@@ -195,6 +195,7 @@ class MundoKnifeGame3D {
         this.fixedDt = this.getPlatformAdjustedTimestep();
         this.currentState = null;
         this.previousState = null;
+        this.lastHealthByTeam = {};
         
         
         this.eventListeners = {
@@ -1882,6 +1883,44 @@ class MundoKnifeGame3D {
         }, 1000);
     }
 
+    applyRemoteHealthUpdate(data, eventName) {
+        console.log(`[HEALTH-RECV] Received ${eventName} - myTeam:${this.myTeam} opponentTeam:${this.opponentTeam} targetTeam:${data.targetTeam} health:${data.health}`);
+        
+        if (this.lastHealthByTeam[data.targetTeam] === data.health) {
+            console.log('[HEALTH-RECV] Duplicate health update detected, skipping');
+            return;
+        }
+        
+        const clampedHealth = Math.max(0, Math.min(data.health, 5));
+        if (clampedHealth !== data.health) {
+            console.log(`[HEALTH-RECV] Clamped health from ${data.health} to ${clampedHealth}`);
+        }
+        
+        this.lastHealthByTeam[data.targetTeam] = clampedHealth;
+        
+        if (data.targetTeam === this.myTeam) {
+            console.log(`[HEALTH-RECV] Updating playerSelf health: ${this.playerSelf.health} → ${clampedHealth}`);
+            this.playerSelf.health = clampedHealth;
+            this.updateHealthDisplay();
+            
+            if (this.playerSelf.health <= 0) {
+                console.log('☠️ [DEATH] PlayerSelf has died');
+                this.handlePlayerDeath(this.playerSelf);
+            }
+        } else if (data.targetTeam === this.opponentTeam) {
+            console.log(`[HEALTH-RECV] Updating playerOpponent health: ${this.playerOpponent.health} → ${clampedHealth}`);
+            this.playerOpponent.health = clampedHealth;
+            this.updateHealthDisplay();
+            
+            if (this.playerOpponent.health <= 0) {
+                console.log('☠️ [DEATH] PlayerOpponent has died');
+                this.handlePlayerDeath(this.playerOpponent);
+            }
+        } else {
+            console.log('[HEALTH-RECV] WARNING: Received health update for unknown team', data.targetTeam);
+        }
+    }
+
     setupMultiplayerEvents() {
         if (!this.isMultiplayer || !socket) return;
         
@@ -1897,51 +1936,15 @@ class MundoKnifeGame3D {
         });
         
         socket.on('opponentHealthUpdate', (data) => {
-            console.log('[HEALTH] Received opponentHealthUpdate - myTeam:', this.myTeam, 'opponentTeam:', this.opponentTeam, 'targetTeam:', data.targetTeam, 'health:', data.health);
-            
-            if (data.targetTeam === this.myTeam) {
-                console.log('[HEALTH] Updating playerSelf health to', data.health);
-                this.playerSelf.health = data.health;
-                this.updateHealthDisplay();
-                
-                if (this.playerSelf.health <= 0) {
-                    console.log('☠️ [DEATH] PlayerSelf has died');
-                    this.handlePlayerDeath(this.playerSelf);
-                }
-            } else if (data.targetTeam === this.opponentTeam) {
-                console.log('[HEALTH] Updating playerOpponent health to', data.health);
-                this.playerOpponent.health = data.health;
-                this.updateHealthDisplay();
-                
-                if (this.playerOpponent.health <= 0) {
-                    console.log('☠️ [DEATH] PlayerOpponent has died');
-                    this.handlePlayerDeath(this.playerOpponent);
-                }
-            }
+            this.applyRemoteHealthUpdate(data, 'opponentHealthUpdate');
         });
         
         socket.on('healthUpdate', (data) => {
-            console.log('[HEALTH] Received healthUpdate (fallback) - myTeam:', this.myTeam, 'opponentTeam:', this.opponentTeam, 'targetTeam:', data.targetTeam, 'health:', data.health);
-            
-            if (data.targetTeam === this.myTeam) {
-                console.log('[HEALTH] Updating playerSelf health to', data.health);
-                this.playerSelf.health = data.health;
-                this.updateHealthDisplay();
-                
-                if (this.playerSelf.health <= 0) {
-                    console.log('☠️ [DEATH] PlayerSelf has died');
-                    this.handlePlayerDeath(this.playerSelf);
-                }
-            } else if (data.targetTeam === this.opponentTeam) {
-                console.log('[HEALTH] Updating playerOpponent health to', data.health);
-                this.playerOpponent.health = data.health;
-                this.updateHealthDisplay();
-                
-                if (this.playerOpponent.health <= 0) {
-                    console.log('☠️ [DEATH] PlayerOpponent has died');
-                    this.handlePlayerDeath(this.playerOpponent);
-                }
-            }
+            this.applyRemoteHealthUpdate(data, 'healthUpdate');
+        });
+        
+        socket.on('playerHealthUpdate', (data) => {
+            this.applyRemoteHealthUpdate(data, 'playerHealthUpdate');
         });
         
         socket.on('playerLoadUpdate', (playerLoadStatus) => {
