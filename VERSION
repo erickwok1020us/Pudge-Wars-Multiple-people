@@ -1,21 +1,27 @@
-V423
+V424
 
 Release Date: 2025-01-30
 
-Bug Fix: Movement Speed Synchronization + Grace Window Optimization
+Bug Fix: Comprehensive Movement & Collision Fixes
 
-Fixed critical bug where characters moved extremely slowly with stuttering.
-Reduced grace window from 150ms to 100ms for better responsiveness.
+Fixed remaining stuttering, knife collision failures, and latency-related jitter.
 
-Root Cause (V423):
-- Server PLAYER_SPEED was 2.5 units/sec but client expected 23.4 units/sec (9.36x mismatch)
-- This caused extreme stuttering and slow movement (1 minute to reach nearby locations)
-- 150ms grace window was slightly too long, causing minor jitter
+Root Causes (V424):
+- Opponent position was hard-set every 50ms causing visible jitter
+- Knife collision used discrete point checks, causing tunneling when dt spikes
+- Server dt was variable, causing inconsistent physics simulation
 
-Changes (V423):
-- Backend fix: Server PLAYER_SPEED increased from 2.5 to 23.4 units/second (matches client)
-- Frontend fix: Reduced grace window from 150ms to 100ms for better responsiveness
-- Speeds now synchronized, eliminating constant position corrections
+Changes (V424):
+Frontend:
+- Implemented opponent position interpolation with 100ms buffer for smooth movement
+- Opponent now smoothly interpolates between server snapshots instead of hard-snapping
+- Eliminates visible jitter from 30-60ms latency fluctuations
+
+Backend:
+- Implemented swept collision detection for knives (line-circle intersection)
+- Prevents tunneling by checking knife path between frames, not just endpoints
+- Fixed timestep physics (always 1/60s) for stable simulation regardless of dt spikes
+- Knives now reliably hit opponents even during lag spikes
 
 Previous Changes (V422):
 - Client now receives targetX/targetZ from server in serverGameState event

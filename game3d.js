@@ -198,6 +198,8 @@ class MundoKnifeGame3D {
         this.lastHealthByTeam = {};
         this.lastMoveInputTime = 0;
         
+        this.opponentSnapshots = [];
+        this.interpolationDelay = 100;
         
         this.eventListeners = {
             documentContextMenu: null,
@@ -1452,6 +1454,7 @@ class MundoKnifeGame3D {
         }
         
         if (this.isMultiplayer && player === this.playerOpponent) {
+            this.interpolateOpponentPosition();
             return;
         }
         
@@ -1481,6 +1484,58 @@ class MundoKnifeGame3D {
                 player.mesh.position.y = groundY;
                 player.y = groundY;
             }
+        }
+    }
+    
+    interpolateOpponentPosition() {
+        if (this.opponentSnapshots.length < 2) return;
+        
+        const now = Date.now();
+        const renderTime = now - this.interpolationDelay;
+        
+        let snapshot0 = null;
+        let snapshot1 = null;
+        
+        for (let i = 0; i < this.opponentSnapshots.length - 1; i++) {
+            if (this.opponentSnapshots[i].timestamp <= renderTime && 
+                this.opponentSnapshots[i + 1].timestamp >= renderTime) {
+                snapshot0 = this.opponentSnapshots[i];
+                snapshot1 = this.opponentSnapshots[i + 1];
+                break;
+            }
+        }
+        
+        if (!snapshot0 || !snapshot1) {
+            const latest = this.opponentSnapshots[this.opponentSnapshots.length - 1];
+            this.playerOpponent.x = latest.x;
+            this.playerOpponent.z = latest.z;
+            this.playerOpponent.targetX = latest.targetX;
+            this.playerOpponent.targetZ = latest.targetZ;
+            this.playerOpponent.isMoving = latest.isMoving;
+            
+            if (this.playerOpponent.mesh) {
+                this.playerOpponent.mesh.position.x = latest.x;
+                this.playerOpponent.mesh.position.z = latest.z;
+            }
+            return;
+        }
+        
+        const timeDiff = snapshot1.timestamp - snapshot0.timestamp;
+        const t = timeDiff > 0 ? (renderTime - snapshot0.timestamp) / timeDiff : 0;
+        const clampedT = Math.max(0, Math.min(1, t));
+        
+        const interpolatedX = snapshot0.x + (snapshot1.x - snapshot0.x) * clampedT;
+        const interpolatedZ = snapshot0.z + (snapshot1.z - snapshot0.z) * clampedT;
+        
+        this.playerOpponent.x = interpolatedX;
+        this.playerOpponent.z = interpolatedZ;
+        this.playerOpponent.targetX = snapshot1.targetX;
+        this.playerOpponent.targetZ = snapshot1.targetZ;
+        this.playerOpponent.isMoving = snapshot1.isMoving;
+        
+        if (this.playerOpponent.mesh) {
+            this.playerOpponent.mesh.position.x = interpolatedX;
+            this.playerOpponent.mesh.position.z = interpolatedZ;
         }
     }
 
@@ -2048,19 +2103,17 @@ class MundoKnifeGame3D {
                             this.playerSelf.targetZ = serverPlayer.targetZ;
                         }
                     } else if (team === this.opponentTeam) {
-                        this.playerOpponent.x = serverPlayer.x;
-                        this.playerOpponent.z = serverPlayer.z;
+                        this.opponentSnapshots.push({
+                            timestamp: Date.now(),
+                            x: serverPlayer.x,
+                            z: serverPlayer.z,
+                            targetX: serverPlayer.targetX,
+                            targetZ: serverPlayer.targetZ,
+                            isMoving: serverPlayer.isMoving
+                        });
                         
-                        if (serverPlayer.targetX != null && serverPlayer.targetZ != null) {
-                            this.playerOpponent.targetX = serverPlayer.targetX;
-                            this.playerOpponent.targetZ = serverPlayer.targetZ;
-                        }
-                        
-                        this.playerOpponent.isMoving = serverPlayer.isMoving;
-                        
-                        if (this.playerOpponent.mesh) {
-                            this.playerOpponent.mesh.position.x = serverPlayer.x;
-                            this.playerOpponent.mesh.position.z = serverPlayer.z;
+                        if (this.opponentSnapshots.length > 10) {
+                            this.opponentSnapshots.shift();
                         }
                     }
                 });
