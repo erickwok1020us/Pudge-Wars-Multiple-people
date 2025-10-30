@@ -2566,12 +2566,45 @@ function handleTeamSelect(team) {
 function selectMultiplayerMode(mode) {
     practiceMode = mode;
     
-    document.getElementById('modeSelection').style.display = 'none';
-    document.getElementById('roomDetails').style.display = 'block';
+    console.log('[CREATE-ROOM] Hiding mode selection, showing waiting room');
+    
+    const createRoomInterface = document.getElementById('createRoomInterface');
+    if (createRoomInterface) {
+        createRoomInterface.style.display = 'none';
+    }
+    
+    const waitingRoom = document.getElementById('waitingRoom');
+    if (waitingRoom) {
+        waitingRoom.style.display = 'block';
+    } else {
+        console.error('[CREATE-ROOM] waitingRoom element not found!');
+        return;
+    }
+    
+    const waitingRoomTitle = document.getElementById('waitingRoomTitle');
+    if (waitingRoomTitle) {
+        waitingRoomTitle.textContent = 'Create Room';
+    }
     
     roomCode = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
-    document.getElementById('roomCode').textContent = roomCode;
+    const roomCodeEl = document.getElementById('roomCode');
+    if (roomCodeEl) {
+        roomCodeEl.textContent = roomCode;
+    } else {
+        console.error('[CREATE-ROOM] roomCode element not found!');
+    }
     
+    const readyBtn = document.getElementById('readyBtn');
+    if (readyBtn) {
+        readyBtn.style.display = 'block';
+    }
+    
+    const readyBtnJoin = document.getElementById('readyBtnJoin');
+    if (readyBtnJoin) {
+        readyBtnJoin.style.display = 'none';
+    }
+    
+    console.log('[CREATE-ROOM] Rendering team-based UI for mode:', mode);
     renderTeamBasedUI(mode);
     
     if (!socket) {
@@ -2733,6 +2766,8 @@ function joinRoom() {
     socket.off('joinSuccess');
     socket.once('joinSuccess', (data) => {
         if (data.roomCode === inputCode) {
+            console.log('[JOIN-ROOM] joinSuccess received, hiding join interface, showing waiting room');
+            
             roomCode = inputCode;
             isHost = false;
             myPlayerId = data.playerId;
@@ -2743,21 +2778,55 @@ function joinRoom() {
             const modeText = data.gameMode === '1v1' ? '1v1 (2 Players)' : '3v3 (6 Players)';
             statusDiv.innerHTML = `<p style="color: #4CAF50;">Successfully joined ${modeText} room! Waiting for host to start...</p>`;
             
-            const joinGameBtn = document.getElementById('joinGameBtn');
-            if (joinGameBtn) {
-                joinGameBtn.style.display = 'none';
+            const joinRoomInterface = document.getElementById('joinRoomInterface');
+            if (joinRoomInterface) {
+                joinRoomInterface.style.display = 'none';
+            } else {
+                console.error('[JOIN-ROOM] joinRoomInterface element not found!');
             }
             
-            const readyBtn = document.getElementById('readyBtnJoin');
+            const waitingRoom = document.getElementById('waitingRoom');
+            if (waitingRoom) {
+                waitingRoom.style.display = 'block';
+            } else {
+                console.error('[JOIN-ROOM] waitingRoom element not found!');
+                statusDiv.innerHTML = '<p style="color: #ff4444;">Error: Waiting room UI not found</p>';
+                return;
+            }
+            
+            const waitingRoomTitle = document.getElementById('waitingRoomTitle');
+            if (waitingRoomTitle) {
+                waitingRoomTitle.textContent = 'Join Room';
+            }
+            
+            const roomCodeEl = document.getElementById('roomCode');
+            if (roomCodeEl) {
+                roomCodeEl.textContent = roomCode;
+            } else {
+                console.error('[JOIN-ROOM] roomCode element not found!');
+            }
+            
+            const readyBtn = document.getElementById('readyBtn');
             if (readyBtn) {
-                readyBtn.style.display = 'block';
+                readyBtn.style.display = 'none';
             }
             
-            document.getElementById('joinRoomInterface').style.display = 'none';
-            document.getElementById('roomDetails').style.display = 'block';
-            document.getElementById('roomCode').textContent = roomCode;
+            const readyBtnJoin = document.getElementById('readyBtnJoin');
+            if (readyBtnJoin) {
+                readyBtnJoin.style.display = 'block';
+            } else {
+                console.error('[JOIN-ROOM] readyBtnJoin element not found!');
+            }
             
+            const startGameBtn = document.getElementById('startGameBtn');
+            if (startGameBtn) {
+                startGameBtn.style.display = 'none';
+            }
+            
+            console.log('[JOIN-ROOM] Rendering team-based UI for mode:', data.gameMode);
             renderTeamBasedUI(data.gameMode);
+            
+            console.log('[JOIN-ROOM] Join success complete, waiting room displayed');
         }
     });
     
@@ -2894,6 +2963,12 @@ function startGame(isMultiplayer = false) {
     document.getElementById('modeSelectionInterface').style.display = 'none';
     document.getElementById('createRoomInterface').style.display = 'none';
     document.getElementById('joinRoomInterface').style.display = 'none';
+    
+    const waitingRoom = document.getElementById('waitingRoom');
+    if (waitingRoom) {
+        waitingRoom.style.display = 'none';
+    }
+    
     document.getElementById('gameContainer').style.display = 'block';
     
     const mainMenuVideo = document.querySelector('.main-menu-video');
