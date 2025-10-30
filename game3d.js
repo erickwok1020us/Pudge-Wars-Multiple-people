@@ -2474,14 +2474,28 @@ function renderTeamBasedUI(mode) {
         slot1.className = 'team-player-slot empty';
         slot1.dataset.team = '1';
         slot1.dataset.slotIndex = i;
-        slot1.innerHTML = '<span>Empty Slot</span>';
+        if (!isReady) {
+            slot1.style.cursor = 'pointer';
+            slot1.innerHTML = '<span>Click to join</span>';
+            slot1.onclick = () => handleTeamSelect(1);
+            console.log('[SLOTS] Made Team 1 slot clickable for mode:', mode);
+        } else {
+            slot1.innerHTML = '<span>Empty Slot</span>';
+        }
         team1Slots.appendChild(slot1);
         
         const slot2 = document.createElement('div');
         slot2.className = 'team-player-slot empty';
         slot2.dataset.team = '2';
         slot2.dataset.slotIndex = i;
-        slot2.innerHTML = '<span>Empty Slot</span>';
+        if (!isReady) {
+            slot2.style.cursor = 'pointer';
+            slot2.innerHTML = '<span>Click to join</span>';
+            slot2.onclick = () => handleTeamSelect(2);
+            console.log('[SLOTS] Made Team 2 slot clickable for mode:', mode);
+        } else {
+            slot2.innerHTML = '<span>Empty Slot</span>';
+        }
         team2Slots.appendChild(slot2);
     }
 }
@@ -2537,10 +2551,11 @@ function updateTeamBasedUI(roomState) {
             } else {
                 slot.className = 'team-player-slot empty';
                 
-                if (gameMode === '3v3' && !isReady && teamPlayers.length < 3) {
+                if (!isReady && teamPlayers.length < maxPerTeam) {
                     slot.style.cursor = 'pointer';
                     slot.innerHTML = '<span>Click to join</span>';
                     slot.onclick = () => handleTeamSelect(teamNum);
+                    console.log('[SLOTS] Made Team', teamNum, 'slot clickable for mode:', gameMode);
                 } else {
                     slot.innerHTML = '<span>Empty Slot</span>';
                     slot.onclick = null;
