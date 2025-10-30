@@ -1,18 +1,18 @@
-V419
+V420
 
 Release Date: 2025-01-30
 
-Bug Fix: Spawn Position Synchronization + Performance Optimization
+Bug Fix: Spawn Position + Hit Effects + Performance Optimization
 
-Fixed critical spawn position desynchronization where players appeared at different positions on each client's screen.
+Fixed critical spawn position bug where players spawned at (0,0) instead of team positions.
+Fixed missing hit effects and audio when knife hits opponent.
 Also fixed latency regression (35ms → 70ms) caused by excessive logging.
 
 Root Cause:
-- Server initialized players at (0, 0) by default in addPlayer()
-- Server never sent initial spawn positions to clients
-- Each client generated its own spawn positions locally using generateTeamSpawnPositions()
-- Result: Host saw both players on left side, guest saw both players on right side
-- Server collision detection used (0, 0), so knives hit even when thrown to empty space visually
+- Team assignment from client was a string ("1" or "2") but initializeSpawnPositions() used strict equality (=== 1/2)
+- Type mismatch caused no spawn branch to execute, leaving players at default (0, 0)
+- serverKnifeHit handler only created effects if knife object was found by ID
+- Predicted knives might already be removed, causing no visual/audio feedback
 - Excessive logging on every player move caused latency to double from 35ms to 70ms
 
 Changes:
@@ -20,9 +20,13 @@ Changes:
 - Optimized position error calculation using squared distance (avoids sqrt())
 - Self position only corrected when error² > 25 (equivalent to 5 units)
 - Opponent position always updated from server (no client-side prediction)
+- Fixed serverKnifeHit to ALWAYS create blood effect and play hit sound, even if knife not found
+- This ensures hit feedback is shown regardless of client-side prediction state
 - Removed high-frequency logs: [CLIENT-PREDICTION] on every move
 - Removed high-frequency logs: [SERVER-RECONCILE] on every position update
 - This ensures both clients see players at the same positions with minimal latency
+
+Note: Map boundary restrictions remain client-side only (isWithinMapBounds in game3d.js)
 
 Previous Fixes (V418):
 

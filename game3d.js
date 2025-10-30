@@ -1994,9 +1994,16 @@ class MundoKnifeGame3D {
         socket.on('serverKnifeHit', (data) => {
             console.log(`[SERVER-KNIFE] Knife hit - knifeId:${data.knifeId} targetTeam:${data.targetTeam}`);
             
+            this.createBloodEffect(data.hitX, 5, data.hitZ);
+            
+            const hitSound = document.getElementById('hitSound');
+            if (hitSound) {
+                hitSound.currentTime = 0;
+                hitSound.play().catch(e => {});
+            }
+            
             const knife = this.knives.find(k => k.knifeId === data.knifeId);
             if (knife) {
-                this.createBloodEffect(data.hitX, 5, data.hitZ);
                 this.disposeKnife(knife);
                 const index = this.knives.indexOf(knife);
                 if (index > -1) {
