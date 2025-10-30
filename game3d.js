@@ -2036,17 +2036,16 @@ class MundoKnifeGame3D {
                         if (positionErrorSq > 25) {
                             this.playerSelf.x = serverPlayer.x;
                             this.playerSelf.z = serverPlayer.z;
-                            
-                            if (this.playerSelf.mesh) {
-                                this.playerSelf.mesh.position.x = serverPlayer.x;
-                                this.playerSelf.mesh.position.z = serverPlayer.z;
-                            }
                         }
                         
+                        this.playerSelf.targetX = serverPlayer.targetX;
+                        this.playerSelf.targetZ = serverPlayer.targetZ;
                         this.playerSelf.isMoving = serverPlayer.isMoving;
                     } else if (serverPlayer.team === this.opponentTeam) {
                         this.playerOpponent.x = serverPlayer.x;
                         this.playerOpponent.z = serverPlayer.z;
+                        this.playerOpponent.targetX = serverPlayer.targetX;
+                        this.playerOpponent.targetZ = serverPlayer.targetZ;
                         this.playerOpponent.isMoving = serverPlayer.isMoving;
                         
                         if (this.playerOpponent.mesh) {

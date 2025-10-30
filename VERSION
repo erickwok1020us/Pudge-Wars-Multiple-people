@@ -1,30 +1,31 @@
-V420
+V422
 
 Release Date: 2025-01-30
 
-Bug Fix: Spawn Position + Hit Effects + Performance Optimization
+Bug Fix: Movement Synchronization (Receive targetX/targetZ from Server)
 
-Fixed critical spawn position bug where players spawned at (0,0) instead of team positions.
-Fixed missing hit effects and audio when knife hits opponent.
-Also fixed latency regression (35ms → 70ms) caused by excessive logging.
+Fixed critical bug where characters showed running animation but didn't actually move (running in place).
+Client now receives targetX/targetZ from server to know where players are trying to move.
 
 Root Cause:
-- Team assignment from client was a string ("1" or "2") but initializeSpawnPositions() used strict equality (=== 1/2)
-- Type mismatch caused no spawn branch to execute, leaving players at default (0, 0)
-- serverKnifeHit handler only created effects if knife object was found by ID
-- Predicted knives might already be removed, causing no visual/audio feedback
-- Excessive logging on every player move caused latency to double from 35ms to 70ms
+- Server's broadcastGameState() only sent current position (x, z) and isMoving flag
+- Server did NOT send target position (targetX, targetZ)
+- Client received current position but didn't know where player was trying to move to
+- Client's local targetX/targetZ remained unchanged while server position was updated
+- Result: Character mesh showed at server position but tried to move to old local target
+- This caused running-in-place animation
 
 Changes:
-- Modified serverGameState handler to apply server positions for BOTH self and opponent
-- Optimized position error calculation using squared distance (avoids sqrt())
-- Self position only corrected when error² > 25 (equivalent to 5 units)
-- Opponent position always updated from server (no client-side prediction)
-- Fixed serverKnifeHit to ALWAYS create blood effect and play hit sound, even if knife not found
-- This ensures hit feedback is shown regardless of client-side prediction state
-- Removed high-frequency logs: [CLIENT-PREDICTION] on every move
-- Removed high-frequency logs: [SERVER-RECONCILE] on every position update
-- This ensures both clients see players at the same positions with minimal latency
+- Client now receives targetX/targetZ from server in serverGameState event
+- For SELF: Apply server's targetX/targetZ and isMoving to align with server's movement goal
+- For OPPONENT: Apply server's x/z/targetX/targetZ/isMoving for full server authority
+- Position error reconciliation (threshold 25) still applies for self to handle prediction errors
+- updatePlayerMovement() now interpolates toward server-provided target, not stale local target
+
+Previous Fixes (V420):
+- Fixed spawn position bug (team type coercion)
+- Fixed missing hit effects (always show blood/audio)
+- Fixed latency regression (removed high-frequency logs)
 
 Note: Map boundary restrictions remain client-side only (isWithinMapBounds in game3d.js)
 
