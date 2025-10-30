@@ -17,8 +17,12 @@ Root Cause:
 
 Changes:
 - Client now receives targetX/targetZ from server in serverGameState event
-- For SELF: Apply server's targetX/targetZ and isMoving to align with server's movement goal
+- Added Number() type coercion for team comparison to handle string/number mismatches
+- Added 150ms grace window after local input to prevent stale server updates overwriting fresh clicks
+- For SELF: Apply server's targetX/targetZ only after grace window expires
+- For SELF: Do NOT overwrite isMoving from server (let client control based on distance to target)
 - For OPPONENT: Apply server's x/z/targetX/targetZ/isMoving for full server authority
+- Added undefined checks for targetX/targetZ to handle mixed deployments
 - Position error reconciliation (threshold 25) still applies for self to handle prediction errors
 - updatePlayerMovement() now interpolates toward server-provided target, not stale local target
 

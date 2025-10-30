@@ -196,6 +196,7 @@ class MundoKnifeGame3D {
         this.currentState = null;
         this.previousState = null;
         this.lastHealthByTeam = {};
+        this.lastMoveInputTime = 0;
         
         
         this.eventListeners = {
@@ -1103,6 +1104,7 @@ class MundoKnifeGame3D {
             this.playerSelf.isMoving = true;
             
             if (this.isMultiplayer && socket) {
+                this.lastMoveInputTime = Date.now();
                 const actionId = `${Date.now()}-${Math.random()}`;
                 
                 socket.emit('playerMove', {
@@ -2028,7 +2030,9 @@ class MundoKnifeGame3D {
         socket.on('serverGameState', (data) => {
             if (data.players && data.players.length > 0) {
                 data.players.forEach(serverPlayer => {
-                    if (serverPlayer.team === this.myTeam) {
+                    const team = Number(serverPlayer.team);
+                    
+                    if (team === this.myTeam) {
                         const dx = this.playerSelf.x - serverPlayer.x;
                         const dz = this.playerSelf.z - serverPlayer.z;
                         const positionErrorSq = dx * dx + dz * dz;
@@ -2038,14 +2042,20 @@ class MundoKnifeGame3D {
                             this.playerSelf.z = serverPlayer.z;
                         }
                         
-                        this.playerSelf.targetX = serverPlayer.targetX;
-                        this.playerSelf.targetZ = serverPlayer.targetZ;
-                        this.playerSelf.isMoving = serverPlayer.isMoving;
-                    } else if (serverPlayer.team === this.opponentTeam) {
+                        const timeSinceLastInput = Date.now() - this.lastMoveInputTime;
+                        if (serverPlayer.targetX != null && serverPlayer.targetZ != null && timeSinceLastInput > 150) {
+                            this.playerSelf.targetX = serverPlayer.targetX;
+                            this.playerSelf.targetZ = serverPlayer.targetZ;
+                        }
+                    } else if (team === this.opponentTeam) {
                         this.playerOpponent.x = serverPlayer.x;
                         this.playerOpponent.z = serverPlayer.z;
-                        this.playerOpponent.targetX = serverPlayer.targetX;
-                        this.playerOpponent.targetZ = serverPlayer.targetZ;
+                        
+                        if (serverPlayer.targetX != null && serverPlayer.targetZ != null) {
+                            this.playerOpponent.targetX = serverPlayer.targetX;
+                            this.playerOpponent.targetZ = serverPlayer.targetZ;
+                        }
+                        
                         this.playerOpponent.isMoving = serverPlayer.isMoving;
                         
                         if (this.playerOpponent.mesh) {
