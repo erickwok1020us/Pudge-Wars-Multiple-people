@@ -2506,10 +2506,21 @@ function updateTeamBasedUI(roomState) {
     currentRoomState = roomState;
     const { teams, players, gameMode, hostSocket } = roomState;
     
+    console.log('[UPDATE-UI] Updating team UI with roomState:', {
+        gameMode,
+        teams,
+        players,
+        mySocketId: socket?.id,
+        hostSocket
+    });
+    
     const team1Slots = document.getElementById('team1Slots');
     const team2Slots = document.getElementById('team2Slots');
     
-    if (!team1Slots || !team2Slots) return;
+    if (!team1Slots || !team2Slots) {
+        console.error('[UPDATE-UI] team1Slots or team2Slots not found!');
+        return;
+    }
     
     team1Slots.innerHTML = '';
     team2Slots.innerHTML = '';
@@ -2528,7 +2539,20 @@ function updateTeamBasedUI(roomState) {
             if (i < teamPlayers.length) {
                 const socketId = teamPlayers[i];
                 const player = players[socketId];
+                
+                if (!player) {
+                    console.error('[UPDATE-UI] Player not found for socketId:', socketId);
+                    continue;
+                }
+                
                 const isLocalPlayer = socketId === socket.id;
+                
+                console.log('[UPDATE-UI] Rendering player in Team', teamNum, ':', {
+                    socketId,
+                    playerId: player.playerId,
+                    isLocalPlayer,
+                    ready: player.ready
+                });
                 
                 slot.className = 'team-player-slot occupied';
                 if (isLocalPlayer) {
@@ -2568,19 +2592,34 @@ function updateTeamBasedUI(roomState) {
 }
 
 function handleTeamSelect(team) {
-    if (!socket || !roomCode) return;
+    console.log('[TEAM-SELECT] handleTeamSelect called with team:', team);
+    console.log('[TEAM-SELECT] socket:', socket?.id, 'roomCode:', roomCode, 'isReady:', isReady);
+    console.log('[TEAM-SELECT] currentRoomState:', currentRoomState);
+    
+    if (!socket || !roomCode) {
+        console.error('[TEAM-SELECT] Missing socket or roomCode');
+        return;
+    }
     
     if (isReady) {
         console.log('[TEAM-SELECT] Cannot change teams while ready');
         return;
     }
     
-    if (practiceMode === '1v1') {
-        console.log('[TEAM-SELECT] Cannot change teams in 1v1 mode');
+    const inTeam1 = currentRoomState?.teams?.[1]?.includes(socket.id);
+    const inTeam2 = currentRoomState?.teams?.[2]?.includes(socket.id);
+    const inAnyTeam = inTeam1 || inTeam2;
+    
+    console.log('[TEAM-SELECT] Player team status:', { inTeam1, inTeam2, inAnyTeam });
+    
+    if (currentRoomState && currentRoomState.gameMode === '1v1' && inAnyTeam) {
+        console.log('[TEAM-SELECT] Cannot change teams in 1v1 mode once assigned');
+        alert('Cannot change teams in 1v1 mode');
         return;
     }
     
-    socket.emit('teamSelect', { roomCode, team });
+    console.log('[TEAM-SELECT] Emitting selectTeam event for team:', team);
+    socket.emit('selectTeam', { roomCode, team });
 }
 
 function selectMultiplayerMode(mode) {
