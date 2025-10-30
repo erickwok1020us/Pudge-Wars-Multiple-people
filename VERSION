@@ -1,24 +1,32 @@
-V410
+V414
 
 Release Date: 2025-01-30
 
-Server-Authoritative Architecture Implementation
+Bug Fix: Team Selection Logic in 1v1 Mode
+
+Fixed critical issue where players couldn't select teams in 1v1 mode.
+
+Root Cause:
+- handleTeamSelect() was blocking ALL team selection in 1v1 mode
+- Should only block team SWITCHING, not initial team selection
+
+Changes:
+- Fixed handleTeamSelect() to allow first-time team selection in 1v1 mode
+- Only blocks team switching after player is already assigned to a team
+- Added comprehensive debugging logs to track team selection flow
+- Added detailed logging in updateTeamBasedUI() to track roomState processing
+
+Previous Fixes (V411-V413):
+- V413: Made empty slots clickable for both 1v1 and 3v3 modes
+- V412: Fixed room code stuck on "LOADING..." and back button unclickable
+- V411: Fixed UI disappearing after guest clicks JOIN ROOM
+
+Server-Authoritative Architecture (V410):
 - Phase 1: Health Authority
 - Phase 2: Projectile Authority  
 - Phase 3: Movement Authority
-
-This version implements complete server-authoritative game logic where the server
-is the single source of truth for all game state (health, projectiles, movement).
 
 Key Features:
 - 240fps client rendering
 - Client-side prediction for responsiveness
 - Server reconciliation for accuracy
-- Prevents desynchronization across different networks
-- Foundation for future game templates
-
-Client-Side Implementation:
-- Predicts local player actions (movement, knife throws)
-- Receives authoritative updates from server at 20Hz
-- Reconciles predicted state with server state
-- Interpolates opponent positions for smooth gameplay
