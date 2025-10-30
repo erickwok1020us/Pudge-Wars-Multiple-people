@@ -1,0 +1,24 @@
+V410
+
+Release Date: 2025-01-30
+
+Server-Authoritative Architecture Implementation
+- Phase 1: Health Authority
+- Phase 2: Projectile Authority  
+- Phase 3: Movement Authority
+
+This version implements complete server-authoritative game logic where the server
+is the single source of truth for all game state (health, projectiles, movement).
+
+Key Features:
+- 240fps client rendering
+- Client-side prediction for responsiveness
+- Server reconciliation for accuracy
+- Prevents desynchronization across different networks
+- Foundation for future game templates
+
+Client-Side Implementation:
+- Predicts local player actions (movement, knife throws)
+- Receives authoritative updates from server at 20Hz
+- Reconciles predicted state with server state
+- Interpolates opponent positions for smooth gameplay

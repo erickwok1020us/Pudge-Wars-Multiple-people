@@ -1103,10 +1103,14 @@ class MundoKnifeGame3D {
             this.playerSelf.isMoving = true;
             
             if (this.isMultiplayer && socket) {
+                const actionId = `${Date.now()}-${Math.random()}`;
+                console.log(`[CLIENT-PREDICTION] Predicting move to (${point.x.toFixed(2)}, ${point.z.toFixed(2)}) with actionId: ${actionId}`);
+                
                 socket.emit('playerMove', {
                     roomCode: roomCode,
                     targetX: point.x,
-                    targetZ: point.z
+                    targetZ: point.z,
+                    actionId: actionId
                 });
             }
         }
@@ -1138,7 +1142,25 @@ class MundoKnifeGame3D {
             knifeAudio.volume = 0.4;
             knifeAudio.play().catch(e => {});
             
-            this.createKnife3DTowards(this.playerSelf, targetX, targetZ, this.raycaster.ray.direction, knifeAudio);
+            const actionId = `${Date.now()}-${Math.random()}`;
+            
+            if (this.isMultiplayer && socket) {
+                const predictedKnife = this.createKnife3DTowards(this.playerSelf, targetX, targetZ, this.raycaster.ray.direction, knifeAudio);
+                if (predictedKnife) {
+                    predictedKnife.actionId = actionId;
+                    predictedKnife.isPredicted = true;
+                    console.log(`[CLIENT-PREDICTION] Created predicted knife with actionId: ${actionId}`);
+                }
+                
+                socket.emit('knifeThrow', {
+                    roomCode: roomCode,
+                    targetX: targetX,
+                    targetZ: targetZ,
+                    actionId: actionId
+                });
+            } else {
+                this.createKnife3DTowards(this.playerSelf, targetX, targetZ, this.raycaster.ray.direction, knifeAudio);
+            }
             
             this.playerSelf.isThrowingKnife = true;
             this.playerSelf.isMoving = false;
@@ -1149,15 +1171,6 @@ class MundoKnifeGame3D {
             setTimeout(() => {
                 this.playerSelf.isThrowingKnife = false;
             }, 2500);
-            
-            if (this.isMultiplayer && socket) {
-                socket.emit('knifeThrow', {
-                    roomCode: roomCode,
-                    targetX: targetX,
-                    targetZ: targetZ,
-                    fromPlayer: 1
-                });
-            }
         }
     }
 
@@ -1532,20 +1545,18 @@ class MundoKnifeGame3D {
     }
 
     checkKnifeCollisions(knife, knifeIndex) {
+        if (this.isMultiplayer) {
+            return;
+        }
+        
         const knifeWorldPos = new THREE.Vector3();
         knife.mesh.getWorldPosition(knifeWorldPos);
         
         const thrower = knife.thrower;
         const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
         
-        const isLocalKnife = !this.isMultiplayer || knife.ownerIsLocal;
-        
         targetTeam.forEach(target => {
             if (target.health <= 0) return;
-            
-            if (!isLocalKnife && target.team !== this.myTeam) {
-                return;
-            }
             
             const targetWorldPos = new THREE.Vector3();
             if (target.mesh) {
@@ -1562,8 +1573,7 @@ class MundoKnifeGame3D {
             const threshold = this.characterSize * 1.05;
             
             if (distance < threshold) {
-                const knifeSource = isLocalKnife ? 'LOCAL' : 'REMOTE';
-                console.log(`💥 [HIT-${knifeSource}] Knife from Team${thrower.team} hit Team${target.team} Player${target.playerIndex}! Health before: ${target.health}`);
+                console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit Team${target.team} Player${target.playerIndex}!`);
                 
                 this.createBloodEffect(targetWorldPos.x, targetWorldPos.y, targetWorldPos.z);
                 
@@ -1573,28 +1583,17 @@ class MundoKnifeGame3D {
                     hitSound.play().catch(e => {});
                 }
                 
+                this.disposeKnife(knife);
+                this.knives.splice(knifeIndex, 1);
+                
                 target.health--;
                 console.log(`💔 [HEALTH] Team${target.team} Player${target.playerIndex} health after hit: ${target.health}/${target.maxHealth}`);
                 
                 this.updateHealthDisplay();
                 
-                this.disposeKnife(knife);
-                this.knives.splice(knifeIndex, 1);
-                
                 if (target.health <= 0) {
                     console.log(`☠️ [DEATH] Team${target.team} Player${target.playerIndex} has died`);
                     this.handlePlayerDeath(target);
-                }
-                
-                if (isLocalKnife && this.isMultiplayer && socket) {
-                    const healthData = {
-                        roomCode: roomCode,
-                        targetTeam: target.team,
-                        health: target.health
-                    };
-                    console.log('[HEALTH-EMIT] Emitting health update - roomCode:', roomCode, 'targetTeam:', target.team, 'health:', target.health);
-                    socket.emit('healthUpdate', healthData);
-                    socket.emit('playerHealthUpdate', healthData);
                 }
             }
         });
@@ -1924,6 +1923,35 @@ class MundoKnifeGame3D {
         }
     }
 
+    applyServerHealthUpdate(data) {
+        console.log(`[SERVER-HEALTH] Applying authoritative update - targetTeam:${data.targetTeam} health:${data.health} isDead:${data.isDead}`);
+        
+        const clampedHealth = Math.max(0, Math.min(data.health, 5));
+        this.lastHealthByTeam[data.targetTeam] = clampedHealth;
+        
+        if (data.targetTeam === this.myTeam) {
+            console.log(`[SERVER-HEALTH] Updating playerSelf health: ${this.playerSelf.health} → ${clampedHealth}`);
+            this.playerSelf.health = clampedHealth;
+            this.updateHealthDisplay();
+            
+            if (data.isDead && this.playerSelf.health <= 0) {
+                console.log('☠️ [SERVER-DEATH] PlayerSelf has died (server confirmed)');
+                this.handlePlayerDeath(this.playerSelf);
+            }
+        } else if (data.targetTeam === this.opponentTeam) {
+            console.log(`[SERVER-HEALTH] Updating playerOpponent health: ${this.playerOpponent.health} → ${clampedHealth}`);
+            this.playerOpponent.health = clampedHealth;
+            this.updateHealthDisplay();
+            
+            if (data.isDead && this.playerOpponent.health <= 0) {
+                console.log('☠️ [SERVER-DEATH] PlayerOpponent has died (server confirmed)');
+                this.handlePlayerDeath(this.playerOpponent);
+            }
+        } else {
+            console.log('[SERVER-HEALTH] WARNING: Received health update for unknown team', data.targetTeam);
+        }
+    }
+
     setupMultiplayerEvents() {
         if (!this.isMultiplayer || !socket) return;
         
@@ -1933,9 +1961,95 @@ class MundoKnifeGame3D {
             this.playerOpponent.isMoving = true;
         });
         
+        socket.on('serverKnifeSpawn', (data) => {
+            console.log(`[SERVER-KNIFE] Knife spawned - knifeId:${data.knifeId} ownerTeam:${data.ownerTeam} actionId:${data.actionId}`);
+            
+            if (data.ownerTeam === this.myTeam && data.actionId) {
+                const predictedKnife = this.knives.find(k => k.actionId === data.actionId && k.isPredicted);
+                if (predictedKnife) {
+                    console.log(`[SERVER-RECONCILE] Found predicted knife, replacing with server knife ${data.knifeId}`);
+                    predictedKnife.knifeId = data.knifeId;
+                    predictedKnife.isPredicted = false;
+                    predictedKnife.serverConfirmed = true;
+                    return;
+                }
+            }
+            
+            if (data.ownerTeam !== this.myTeam) {
+                const thrower = data.ownerTeam === this.opponentTeam ? this.playerOpponent : null;
+                if (thrower) {
+                    const targetX = data.x + data.velocityX * 10;
+                    const targetZ = data.z + data.velocityZ * 10;
+                    const knife = this.createKnife3DTowards(thrower, targetX, targetZ, null);
+                    if (knife) {
+                        knife.knifeId = data.knifeId;
+                        knife.serverConfirmed = true;
+                    }
+                }
+            }
+        });
+        
+        socket.on('serverKnifeHit', (data) => {
+            console.log(`[SERVER-KNIFE] Knife hit - knifeId:${data.knifeId} targetTeam:${data.targetTeam}`);
+            
+            const knife = this.knives.find(k => k.knifeId === data.knifeId);
+            if (knife) {
+                this.createBloodEffect(data.hitX, 5, data.hitZ);
+                this.disposeKnife(knife);
+                const index = this.knives.indexOf(knife);
+                if (index > -1) {
+                    this.knives.splice(index, 1);
+                }
+            }
+        });
+        
+        socket.on('serverKnifeDestroy', (data) => {
+            console.log(`[SERVER-KNIFE] Knife destroyed - knifeId:${data.knifeId}`);
+            
+            const knife = this.knives.find(k => k.knifeId === data.knifeId);
+            if (knife) {
+                this.disposeKnife(knife);
+                const index = this.knives.indexOf(knife);
+                if (index > -1) {
+                    this.knives.splice(index, 1);
+                }
+            }
+        });
+        
+        socket.on('serverGameState', (data) => {
+            if (data.players && data.players.length > 0) {
+                data.players.forEach(serverPlayer => {
+                    if (serverPlayer.team === this.opponentTeam) {
+                        const positionError = Math.sqrt(
+                            Math.pow(this.playerOpponent.x - serverPlayer.x, 2) +
+                            Math.pow(this.playerOpponent.z - serverPlayer.z, 2)
+                        );
+                        
+                        if (positionError > 0.5) {
+                            console.log(`[SERVER-RECONCILE] Opponent position error: ${positionError.toFixed(2)}, correcting`);
+                        }
+                        
+                        this.playerOpponent.x = serverPlayer.x;
+                        this.playerOpponent.z = serverPlayer.z;
+                        this.playerOpponent.isMoving = serverPlayer.isMoving;
+                        
+                        if (this.playerOpponent.mesh) {
+                            this.playerOpponent.mesh.position.x = serverPlayer.x;
+                            this.playerOpponent.mesh.position.z = serverPlayer.z;
+                        }
+                    }
+                });
+            }
+        });
+        
         socket.on('opponentKnifeThrow', (data) => {
             this.createKnife3DTowards(this.playerOpponent, data.targetX, data.targetZ, null);
             this.playerOpponent.lastKnifeTime = Date.now();
+        });
+        
+        socket.on('serverHealthUpdate', (data) => {
+            console.log(`[SERVER-HEALTH] Received authoritative health update - targetTeam:${data.targetTeam} health:${data.health} serverTick:${data.serverTick}`);
+            this.applyServerHealthUpdate(data);
         });
         
         socket.on('opponentHealthUpdate', (data) => {
