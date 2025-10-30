@@ -1104,7 +1104,6 @@ class MundoKnifeGame3D {
             
             if (this.isMultiplayer && socket) {
                 const actionId = `${Date.now()}-${Math.random()}`;
-                console.log(`[CLIENT-PREDICTION] Predicting move to (${point.x.toFixed(2)}, ${point.z.toFixed(2)}) with actionId: ${actionId}`);
                 
                 socket.emit('playerMove', {
                     roomCode: roomCode,
@@ -1149,7 +1148,6 @@ class MundoKnifeGame3D {
                 if (predictedKnife) {
                     predictedKnife.actionId = actionId;
                     predictedKnife.isPredicted = true;
-                    console.log(`[CLIENT-PREDICTION] Created predicted knife with actionId: ${actionId}`);
                 }
                 
                 socket.emit('knifeThrow', {
@@ -2023,16 +2021,23 @@ class MundoKnifeGame3D {
         socket.on('serverGameState', (data) => {
             if (data.players && data.players.length > 0) {
                 data.players.forEach(serverPlayer => {
-                    if (serverPlayer.team === this.opponentTeam) {
-                        const positionError = Math.sqrt(
-                            Math.pow(this.playerOpponent.x - serverPlayer.x, 2) +
-                            Math.pow(this.playerOpponent.z - serverPlayer.z, 2)
-                        );
+                    if (serverPlayer.team === this.myTeam) {
+                        const dx = this.playerSelf.x - serverPlayer.x;
+                        const dz = this.playerSelf.z - serverPlayer.z;
+                        const positionErrorSq = dx * dx + dz * dz;
                         
-                        if (positionError > 0.5) {
-                            console.log(`[SERVER-RECONCILE] Opponent position error: ${positionError.toFixed(2)}, correcting`);
+                        if (positionErrorSq > 25) {
+                            this.playerSelf.x = serverPlayer.x;
+                            this.playerSelf.z = serverPlayer.z;
+                            
+                            if (this.playerSelf.mesh) {
+                                this.playerSelf.mesh.position.x = serverPlayer.x;
+                                this.playerSelf.mesh.position.z = serverPlayer.z;
+                            }
                         }
                         
+                        this.playerSelf.isMoving = serverPlayer.isMoving;
+                    } else if (serverPlayer.team === this.opponentTeam) {
                         this.playerOpponent.x = serverPlayer.x;
                         this.playerOpponent.z = serverPlayer.z;
                         this.playerOpponent.isMoving = serverPlayer.isMoving;

@@ -1,15 +1,30 @@
-V418
+V419
 
 Release Date: 2025-01-30
 
-Bug Fix: Movement Synchronization in Server-Authoritative Mode
+Bug Fix: Spawn Position Synchronization + Performance Optimization
 
-Fixed critical movement desynchronization issue where players appeared to move slowly on opponent's screen.
+Fixed critical spawn position desynchronization where players appeared at different positions on each client's screen.
+Also fixed latency regression (35ms → 70ms) caused by excessive logging.
 
 Root Cause:
-- Client-side movement interpolation was still running for opponent in multiplayer mode
-- This created a "tug of war" between client-side prediction and server authoritative updates
-- Opponent appeared to move slowly because client was constantly overriding server position
+- Server initialized players at (0, 0) by default in addPlayer()
+- Server never sent initial spawn positions to clients
+- Each client generated its own spawn positions locally using generateTeamSpawnPositions()
+- Result: Host saw both players on left side, guest saw both players on right side
+- Server collision detection used (0, 0), so knives hit even when thrown to empty space visually
+- Excessive logging on every player move caused latency to double from 35ms to 70ms
+
+Changes:
+- Modified serverGameState handler to apply server positions for BOTH self and opponent
+- Optimized position error calculation using squared distance (avoids sqrt())
+- Self position only corrected when error² > 25 (equivalent to 5 units)
+- Opponent position always updated from server (no client-side prediction)
+- Removed high-frequency logs: [CLIENT-PREDICTION] on every move
+- Removed high-frequency logs: [SERVER-RECONCILE] on every position update
+- This ensures both clients see players at the same positions with minimal latency
+
+Previous Fixes (V418):
 
 Changes:
 - Modified updatePlayerMovement() to skip client-side interpolation for opponent in multiplayer
