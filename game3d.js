@@ -2407,6 +2407,11 @@ function showMainMenu() {
     document.getElementById('joinRoomInterface').style.display = 'none';
     document.getElementById('gameContainer').style.display = 'none';
     
+    const waitingRoom = document.getElementById('waitingRoom');
+    if (waitingRoom) {
+        waitingRoom.style.display = 'none';
+    }
+    
     if (currentGame) {
         currentGame = null;
     }
@@ -2581,25 +2586,26 @@ function selectMultiplayerMode(mode) {
         return;
     }
     
-    const waitingRoomTitle = document.getElementById('waitingRoomTitle');
+    const waitingRoomTitle = waitingRoom.querySelector('#waitingRoomTitle');
     if (waitingRoomTitle) {
         waitingRoomTitle.textContent = 'Create Room';
     }
     
     roomCode = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
-    const roomCodeEl = document.getElementById('roomCode');
+    const roomCodeEl = waitingRoom.querySelector('#roomCode');
     if (roomCodeEl) {
         roomCodeEl.textContent = roomCode;
+        console.log('[CREATE-ROOM] Room code set to:', roomCode);
     } else {
         console.error('[CREATE-ROOM] roomCode element not found!');
     }
     
-    const readyBtn = document.getElementById('readyBtn');
+    const readyBtn = waitingRoom.querySelector('#readyBtn');
     if (readyBtn) {
         readyBtn.style.display = 'block';
     }
     
-    const readyBtnJoin = document.getElementById('readyBtnJoin');
+    const readyBtnJoin = waitingRoom.querySelector('#readyBtnJoin');
     if (readyBtnJoin) {
         readyBtnJoin.style.display = 'none';
     }
@@ -2794,31 +2800,32 @@ function joinRoom() {
                 return;
             }
             
-            const waitingRoomTitle = document.getElementById('waitingRoomTitle');
+            const waitingRoomTitle = waitingRoom.querySelector('#waitingRoomTitle');
             if (waitingRoomTitle) {
                 waitingRoomTitle.textContent = 'Join Room';
             }
             
-            const roomCodeEl = document.getElementById('roomCode');
+            const roomCodeEl = waitingRoom.querySelector('#roomCode');
             if (roomCodeEl) {
                 roomCodeEl.textContent = roomCode;
+                console.log('[JOIN-ROOM] Room code set to:', roomCode);
             } else {
                 console.error('[JOIN-ROOM] roomCode element not found!');
             }
             
-            const readyBtn = document.getElementById('readyBtn');
+            const readyBtn = waitingRoom.querySelector('#readyBtn');
             if (readyBtn) {
                 readyBtn.style.display = 'none';
             }
             
-            const readyBtnJoin = document.getElementById('readyBtnJoin');
+            const readyBtnJoin = waitingRoom.querySelector('#readyBtnJoin');
             if (readyBtnJoin) {
                 readyBtnJoin.style.display = 'block';
             } else {
                 console.error('[JOIN-ROOM] readyBtnJoin element not found!');
             }
             
-            const startGameBtn = document.getElementById('startGameBtn');
+            const startGameBtn = waitingRoom.querySelector('#startGameBtn');
             if (startGameBtn) {
                 startGameBtn.style.display = 'none';
             }

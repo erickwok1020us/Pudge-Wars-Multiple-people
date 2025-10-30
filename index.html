@@ -989,25 +989,6 @@
                     </button>
                 </div>
             </div>
-            <div id="roomDetails" style="display: none;">
-                <h2>Create Room</h2>
-                <p>Share this room code with your friend:</p>
-                <div class="room-code" id="roomCode">Loading...</div>
-                <div class="teams-container" id="teamsContainer">
-                    <div class="team-column" id="team1Column">
-                        <h3>Team 1 (LEFT)</h3>
-                        <div class="team-slots" id="team1Slots"></div>
-                    </div>
-                    <div class="team-column" id="team2Column">
-                        <h3>Team 2 (RIGHT)</h3>
-                        <div class="team-slots" id="team2Slots"></div>
-                    </div>
-                </div>
-                <div class="ready-start-buttons" style="display: flex; gap: 20px; justify-content: center; margin-top: 20px; margin-bottom: 20px;">
-                    <button class="menu-btn" id="readyBtn" onclick="toggleReady()" style="min-width: 150px;">Ready</button>
-                    <button class="menu-btn" id="startGameBtn" onclick="startMultiplayerGame()" style="display: none; opacity: 0.3; min-width: 150px;" disabled>Start Game</button>
-                </div>
-            </div>
             <button class="back-btn" onclick="showMainMenu()">← Back</button>
         </div>
     </div>
@@ -1027,7 +1008,7 @@
     </div>
 
     <div class="room-interface" id="waitingRoom" style="display: none;">
-        <div class="main-menu-overlay"></div>
+        <div class="main-menu-overlay" style="pointer-events: none;"></div>
         <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
         <div class="room-content">
             <h2 id="waitingRoomTitle">Waiting Room</h2>
