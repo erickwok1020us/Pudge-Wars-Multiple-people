@@ -2743,6 +2743,13 @@ function selectMultiplayerMode(mode) {
         startMultiplayerGame();
     });
     
+    socket.off('hostDisconnected');
+    socket.on('hostDisconnected', (data) => {
+        console.log('[HOST-DISCONNECT] Host disconnected:', data.message);
+        alert(data.message || 'Host has left the room. Room is now closed.');
+        returnToMainMenu();
+    });
+    
     const startBtn = document.getElementById('startGameBtn');
     if (startBtn) {
         startBtn.style.display = 'none';
@@ -2920,6 +2927,13 @@ function joinRoom() {
         startMultiplayerGame();
     });
     
+    socket.off('hostDisconnected');
+    socket.on('hostDisconnected', (data) => {
+        console.log('[HOST-DISCONNECT] Host disconnected:', data.message);
+        alert(data.message || 'Host has left the room. Room is now closed.');
+        returnToMainMenu();
+    });
+    
     socket.off('joinError');
     socket.once('joinError', (data) => {
         statusDiv.innerHTML = '<p style="color: #ff4444;">Room code does not exist, please try again</p>';
@@ -2989,20 +3003,43 @@ function toggleReady() {
 }
 
 function updateStartButtonState() {
-    if (!isHost) return;
-    
     const startBtn = document.getElementById('startGameBtn');
     if (!startBtn) return;
     
-    const bothReady = isReady && opponentReady;
-    
-    startBtn.disabled = !bothReady;
-    startBtn.style.opacity = bothReady ? '1' : '0.3';
-    startBtn.style.cursor = bothReady ? 'pointer' : 'not-allowed';
-    
-    if (bothReady) {
-        startBtn.style.display = 'block';
+    if (!currentRoomState || !socket) {
+        console.log('[START-CHECK] No roomState or socket, hiding button');
+        startBtn.style.display = 'none';
+        return;
     }
+    
+    const isHostPlayer = currentRoomState.hostSocket === socket.id;
+    console.log('[START-CHECK] isHost:', isHostPlayer, 'hostSocket:', currentRoomState.hostSocket, 'mySocket:', socket.id);
+    
+    if (!isHostPlayer) {
+        startBtn.style.display = 'none';
+        return;
+    }
+    
+    const allReady = Object.values(currentRoomState.players).every(p => p.ready);
+    const playerCount = Object.keys(currentRoomState.players).length;
+    const team1Count = currentRoomState.teams[1].length;
+    const team2Count = currentRoomState.teams[2].length;
+    
+    let bothTeamsFilled = false;
+    if (currentRoomState.gameMode === '1v1') {
+        bothTeamsFilled = team1Count === 1 && team2Count === 1;
+    } else if (currentRoomState.gameMode === '3v3') {
+        bothTeamsFilled = team1Count >= 1 && team2Count >= 1;
+    }
+    
+    const shouldShow = allReady && bothTeamsFilled && !currentRoomState.gameStarted;
+    
+    console.log('[START-CHECK] allReady:', allReady, 'playerCount:', playerCount, 'team1:', team1Count, 'team2:', team2Count, 'bothTeamsFilled:', bothTeamsFilled, 'gameStarted:', currentRoomState.gameStarted, 'shouldShow:', shouldShow);
+    
+    startBtn.disabled = !shouldShow;
+    startBtn.style.opacity = shouldShow ? '1' : '0.3';
+    startBtn.style.cursor = shouldShow ? 'pointer' : 'not-allowed';
+    startBtn.style.display = shouldShow ? 'block' : 'none';
 }
 
 function startGame(isMultiplayer = false) {

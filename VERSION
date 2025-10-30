@@ -1,32 +1,36 @@
-V414
+V417
 
 Release Date: 2025-01-30
 
-Bug Fix: Team Selection Logic in 1v1 Mode
+Bug Fixes: Start Game Button + Host Disconnect Handling
 
-Fixed critical issue where players couldn't select teams in 1v1 mode.
+Fixed two critical issues in multiplayer functionality.
 
+Issue 1: Start Game Button Not Showing
 Root Cause:
-- handleTeamSelect() was blocking ALL team selection in 1v1 mode
-- Should only block team SWITCHING, not initial team selection
+- updateStartButtonState() was using old isReady/opponentReady variables
+- New team-based system stores ready status in currentRoomState.players[socketId].ready
+- Function wasn't checking roomState, causing button to never show
 
 Changes:
+- Rewrote updateStartButtonState() to use currentRoomState instead of legacy variables
+- Added proper host detection using currentRoomState.hostSocket === socket.id
+- Added team capacity checks (1v1: 1 per team, 3v3: 1+ per team)
+- Added comprehensive debugging logs with [START-CHECK] prefix
+- Button now correctly shows when: all players ready + both teams filled + game not started
+
+Issue 2: Host Disconnect Not Handled
+Root Cause:
+- When host closed browser, guests remained in room with no way to start game
+- No notification sent to remaining players
+
+Changes:
+- Added hostDisconnected event handler
+- When host disconnects, all players receive alert: "Host has left the room. Room is now closed."
+- Players automatically return to main menu
+- Room is deleted from server
+
+Previous Fixes (V415):
 - Fixed handleTeamSelect() to allow first-time team selection in 1v1 mode
 - Only blocks team switching after player is already assigned to a team
 - Added comprehensive debugging logs to track team selection flow
-- Added detailed logging in updateTeamBasedUI() to track roomState processing
-
-Previous Fixes (V411-V413):
-- V413: Made empty slots clickable for both 1v1 and 3v3 modes
-- V412: Fixed room code stuck on "LOADING..." and back button unclickable
-- V411: Fixed UI disappearing after guest clicks JOIN ROOM
-
-Server-Authoritative Architecture (V410):
-- Phase 1: Health Authority
-- Phase 2: Projectile Authority  
-- Phase 3: Movement Authority
-
-Key Features:
-- 240fps client rendering
-- Client-side prediction for responsiveness
-- Server reconciliation for accuracy
