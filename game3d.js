@@ -2341,7 +2341,15 @@ function restartGame() {
 
 function returnToMainMenu() {
     console.log('[MENU] Returning to main menu');
+    
     document.getElementById('gameOverOverlay').style.display = 'none';
+    
+    const gameContainer = document.getElementById('gameContainer');
+    if (gameContainer) {
+        gameContainer.style.display = 'none';
+        gameContainer.style.pointerEvents = 'none';
+    }
+    
     if (currentGame) {
         currentGame.dispose();
         currentGame = null;
@@ -2352,9 +2360,29 @@ function returnToMainMenu() {
     
     const mainMenuVideo = document.querySelector('.main-menu-video');
     if (mainMenuVideo) {
+        mainMenuVideo.muted = true;
+        mainMenuVideo.loop = true;
+        mainMenuVideo.playsinline = true;
         mainMenuVideo.currentTime = 0;
         mainMenuVideo.style.display = 'block';
-        mainMenuVideo.play().catch(e => console.log('Video play failed:', e));
+        mainMenuVideo.style.opacity = '1';
+        
+        const tryPlay = () => {
+            mainMenuVideo.play().catch(e => {
+                console.log('[VIDEO] Play failed, waiting for user interaction:', e);
+                const playOnInteraction = () => {
+                    mainMenuVideo.play().catch(() => {});
+                    document.removeEventListener('pointerdown', playOnInteraction);
+                    document.removeEventListener('click', playOnInteraction);
+                };
+                document.addEventListener('pointerdown', playOnInteraction, { once: true });
+                document.addEventListener('click', playOnInteraction, { once: true });
+            });
+        };
+        
+        requestAnimationFrame(() => {
+            tryPlay();
+        });
     }
     
     showMainMenu();
@@ -2425,38 +2453,126 @@ function showCreateRoom() {
     document.getElementById('modeSelection').style.display = 'block';
     document.getElementById('roomDetails').style.display = 'none';
 }
+let currentRoomState = null;
+
+function renderTeamBasedUI(mode) {
+    const team1Slots = document.getElementById('team1Slots');
+    const team2Slots = document.getElementById('team2Slots');
+    
+    team1Slots.innerHTML = '';
+    team2Slots.innerHTML = '';
+    
+    const maxPerTeam = mode === '1v1' ? 1 : 3;
+    
+    for (let i = 0; i < maxPerTeam; i++) {
+        const slot1 = document.createElement('div');
+        slot1.className = 'team-player-slot empty';
+        slot1.dataset.team = '1';
+        slot1.dataset.slotIndex = i;
+        slot1.innerHTML = '<span>Empty Slot</span>';
+        team1Slots.appendChild(slot1);
+        
+        const slot2 = document.createElement('div');
+        slot2.className = 'team-player-slot empty';
+        slot2.dataset.team = '2';
+        slot2.dataset.slotIndex = i;
+        slot2.innerHTML = '<span>Empty Slot</span>';
+        team2Slots.appendChild(slot2);
+    }
+}
+
+function updateTeamBasedUI(roomState) {
+    if (!roomState) return;
+    
+    currentRoomState = roomState;
+    const { teams, players, gameMode, hostSocket } = roomState;
+    
+    const team1Slots = document.getElementById('team1Slots');
+    const team2Slots = document.getElementById('team2Slots');
+    
+    if (!team1Slots || !team2Slots) return;
+    
+    team1Slots.innerHTML = '';
+    team2Slots.innerHTML = '';
+    
+    const maxPerTeam = gameMode === '1v1' ? 1 : 3;
+    
+    for (let teamNum = 1; teamNum <= 2; teamNum++) {
+        const teamSlots = teamNum === 1 ? team1Slots : team2Slots;
+        const teamPlayers = teams[teamNum] || [];
+        
+        for (let i = 0; i < maxPerTeam; i++) {
+            const slot = document.createElement('div');
+            slot.dataset.team = teamNum;
+            slot.dataset.slotIndex = i;
+            
+            if (i < teamPlayers.length) {
+                const socketId = teamPlayers[i];
+                const player = players[socketId];
+                const isLocalPlayer = socketId === socket.id;
+                
+                slot.className = 'team-player-slot occupied';
+                if (isLocalPlayer) {
+                    slot.classList.add('local-player');
+                }
+                
+                const playerName = `Player ${player.playerId}`;
+                const youMarker = isLocalPlayer ? '<span class="player-you-marker">(You)</span>' : '';
+                const readyStatus = player.ready 
+                    ? '<span class="player-ready-status">Ready</span>' 
+                    : '<span class="player-ready-status player-not-ready">Not Ready</span>';
+                
+                slot.innerHTML = `
+                    <div>
+                        <span class="player-name">${playerName}</span>
+                        ${youMarker}
+                    </div>
+                    <div>${readyStatus}</div>
+                `;
+            } else {
+                slot.className = 'team-player-slot empty';
+                
+                if (gameMode === '3v3' && !isReady && teamPlayers.length < 3) {
+                    slot.style.cursor = 'pointer';
+                    slot.innerHTML = '<span>Click to join</span>';
+                    slot.onclick = () => handleTeamSelect(teamNum);
+                } else {
+                    slot.innerHTML = '<span>Empty Slot</span>';
+                    slot.onclick = null;
+                }
+            }
+            
+            teamSlots.appendChild(slot);
+        }
+    }
+}
+
+function handleTeamSelect(team) {
+    if (!socket || !roomCode) return;
+    
+    if (isReady) {
+        console.log('[TEAM-SELECT] Cannot change teams while ready');
+        return;
+    }
+    
+    if (practiceMode === '1v1') {
+        console.log('[TEAM-SELECT] Cannot change teams in 1v1 mode');
+        return;
+    }
+    
+    socket.emit('teamSelect', { roomCode, team });
+}
+
 function selectMultiplayerMode(mode) {
     practiceMode = mode;
     
     document.getElementById('modeSelection').style.display = 'none';
     document.getElementById('roomDetails').style.display = 'block';
     
-    roomCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+    roomCode = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
     document.getElementById('roomCode').textContent = roomCode;
     
-    const playerSlots = document.getElementById('playerSlots');
-    const maxPlayers = mode === '1v1' ? 2 : 6;
-    playerSlots.innerHTML = '';
-    
-    if (mode === '3v3') {
-        playerSlots.classList.add('mode-3v3');
-    } else {
-        playerSlots.classList.remove('mode-3v3');
-    }
-    
-    for (let i = 1; i <= maxPlayers; i++) {
-        const slot = document.createElement('div');
-        slot.className = i === 1 ? 'player-slot occupied' : 'player-slot empty';
-        slot.id = `player${i}Slot`;
-        
-        if (i === 1) {
-            slot.innerHTML = `<h3>Player 1 (You)</h3><p id="player1Status">Not Ready</p>`;
-        } else {
-            slot.innerHTML = `<h3>Player ${i}</h3><p>Waiting...</p>`;
-        }
-        
-        playerSlots.appendChild(slot);
-    }
+    renderTeamBasedUI(mode);
     
     if (!socket) {
         const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
@@ -2498,32 +2614,34 @@ function selectMultiplayerMode(mode) {
         console.log('[MP] Room created, playerId:', myPlayerId, 'mode:', mode);
     });
     
+    socket.off('roomState');
+    socket.on('roomState', (data) => {
+        console.log('[ROOM-STATE] Received room state update:', data);
+        updateTeamBasedUI(data);
+        updateStartButtonState();
+    });
+    
+    socket.off('teamSelectSuccess');
+    socket.on('teamSelectSuccess', (data) => {
+        console.log('[TEAM-SELECT] Team selection successful:', data.team);
+    });
+    
+    socket.off('teamSelectError');
+    socket.on('teamSelectError', (data) => {
+        console.log('[TEAM-SELECT] Team selection error:', data.message);
+        alert(data.message);
+    });
+    
     socket.off('playerJoined');
     socket.on('playerJoined', (data) => {
         if (data.roomCode === roomCode) {
-            const { playerId } = data;
-            const playerSlot = document.getElementById(`player${playerId}Slot`);
-            if (playerSlot) {
-                playerSlot.className = 'player-slot occupied';
-                playerSlot.innerHTML = `<h3>Player ${playerId}</h3><p id="player${playerId}Status">Not Ready</p>`;
-            }
-            updateStartButtonState();
+            console.log('[MP] Player joined:', data);
         }
     });
     
     socket.off('playerReadyUpdate');
     socket.on('playerReadyUpdate', (data) => {
-        const { playerId, ready } = data;
-        
-        if (playerId !== myPlayerId) {
-            opponentReady = ready;
-            const playerStatus = document.getElementById(`player${playerId}Status`);
-            if (playerStatus) {
-                playerStatus.textContent = ready ? 'Ready to fight!' : 'Not Ready';
-            }
-        }
-        
-        updateStartButtonState();
+        console.log('[MP] Player ready update:', data);
     });
     
     socket.off('gameStart');
@@ -2558,7 +2676,7 @@ function showJoinRoom() {
 }
 
 function joinRoom() {
-    const inputCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+    const inputCode = document.getElementById('roomCodeInput').value.trim();
     const statusDiv = document.getElementById('joinStatus');
     
     if (!inputCode) {
@@ -2567,7 +2685,12 @@ function joinRoom() {
     }
     
     if (inputCode.length !== 6) {
-        statusDiv.innerHTML = '<p style="color: #ff4444;">Room code must be 6 characters</p>';
+        statusDiv.innerHTML = '<p style="color: #ff4444;">Room code must be 6 digits</p>';
+        return;
+    }
+    
+    if (!/^[0-9]{6}$/.test(inputCode)) {
+        statusDiv.innerHTML = '<p style="color: #ff4444;">Room code must contain only numbers</p>';
         return;
     }
     
@@ -2629,16 +2752,36 @@ function joinRoom() {
             if (readyBtn) {
                 readyBtn.style.display = 'block';
             }
+            
+            document.getElementById('joinRoomInterface').style.display = 'none';
+            document.getElementById('roomDetails').style.display = 'block';
+            document.getElementById('roomCode').textContent = roomCode;
+            
+            renderTeamBasedUI(data.gameMode);
         }
+    });
+    
+    socket.off('roomState');
+    socket.on('roomState', (data) => {
+        console.log('[ROOM-STATE] Received room state update (guest):', data);
+        updateTeamBasedUI(data);
+        updateStartButtonState();
+    });
+    
+    socket.off('teamSelectSuccess');
+    socket.on('teamSelectSuccess', (data) => {
+        console.log('[TEAM-SELECT] Team selection successful:', data.team);
+    });
+    
+    socket.off('teamSelectError');
+    socket.on('teamSelectError', (data) => {
+        console.log('[TEAM-SELECT] Team selection error:', data.message);
+        alert(data.message);
     });
     
     socket.off('playerReadyUpdate');
     socket.on('playerReadyUpdate', (data) => {
-        const { playerId, ready } = data;
-        
-        if (playerId === 1) {
-            opponentReady = ready;
-        }
+        console.log('[MP] Player ready update (guest):', data);
     });
     
     socket.off('gameStart');
