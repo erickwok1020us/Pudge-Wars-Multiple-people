@@ -1,10 +1,23 @@
-V417
+V418
 
 Release Date: 2025-01-30
 
-Bug Fixes: Start Game Button + Host Disconnect Handling
+Bug Fix: Movement Synchronization in Server-Authoritative Mode
 
-Fixed two critical issues in multiplayer functionality.
+Fixed critical movement desynchronization issue where players appeared to move slowly on opponent's screen.
+
+Root Cause:
+- Client-side movement interpolation was still running for opponent in multiplayer mode
+- This created a "tug of war" between client-side prediction and server authoritative updates
+- Opponent appeared to move slowly because client was constantly overriding server position
+
+Changes:
+- Modified updatePlayerMovement() to skip client-side interpolation for opponent in multiplayer
+- Server now sends authoritative position updates at 20Hz via serverGameState event
+- Opponent position is now driven entirely by server updates (no client-side prediction)
+- This ensures both players see consistent movement for all characters
+
+Previous Fixes (V417):
 
 Issue 1: Start Game Button Not Showing
 Root Cause:

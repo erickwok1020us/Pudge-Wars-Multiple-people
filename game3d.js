@@ -1451,6 +1451,10 @@ class MundoKnifeGame3D {
             return;
         }
         
+        if (this.isMultiplayer && player === this.playerOpponent) {
+            return;
+        }
+        
         if (player.isMoving && player.targetX !== null && player.targetZ !== null) {
             const dx = player.targetX - player.x;
             const dz = player.targetZ - player.z;
