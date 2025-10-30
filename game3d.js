@@ -2043,7 +2043,7 @@ class MundoKnifeGame3D {
                         }
                         
                         const timeSinceLastInput = Date.now() - this.lastMoveInputTime;
-                        if (serverPlayer.targetX != null && serverPlayer.targetZ != null && timeSinceLastInput > 150) {
+                        if (serverPlayer.targetX != null && serverPlayer.targetZ != null && timeSinceLastInput > 100) {
                             this.playerSelf.targetX = serverPlayer.targetX;
                             this.playerSelf.targetZ = serverPlayer.targetZ;
                         }

@@ -1,24 +1,26 @@
-V422
+V423
 
 Release Date: 2025-01-30
 
-Bug Fix: Movement Synchronization (Receive targetX/targetZ from Server)
+Bug Fix: Movement Speed Synchronization + Grace Window Optimization
 
-Fixed critical bug where characters showed running animation but didn't actually move (running in place).
-Client now receives targetX/targetZ from server to know where players are trying to move.
+Fixed critical bug where characters moved extremely slowly with stuttering.
+Reduced grace window from 150ms to 100ms for better responsiveness.
 
-Root Cause:
-- Server's broadcastGameState() only sent current position (x, z) and isMoving flag
-- Server did NOT send target position (targetX, targetZ)
-- Client received current position but didn't know where player was trying to move to
-- Client's local targetX/targetZ remained unchanged while server position was updated
-- Result: Character mesh showed at server position but tried to move to old local target
-- This caused running-in-place animation
+Root Cause (V423):
+- Server PLAYER_SPEED was 2.5 units/sec but client expected 23.4 units/sec (9.36x mismatch)
+- This caused extreme stuttering and slow movement (1 minute to reach nearby locations)
+- 150ms grace window was slightly too long, causing minor jitter
 
-Changes:
+Changes (V423):
+- Backend fix: Server PLAYER_SPEED increased from 2.5 to 23.4 units/second (matches client)
+- Frontend fix: Reduced grace window from 150ms to 100ms for better responsiveness
+- Speeds now synchronized, eliminating constant position corrections
+
+Previous Changes (V422):
 - Client now receives targetX/targetZ from server in serverGameState event
 - Added Number() type coercion for team comparison to handle string/number mismatches
-- Added 150ms grace window after local input to prevent stale server updates overwriting fresh clicks
+- Added grace window after local input to prevent stale server updates overwriting fresh clicks
 - For SELF: Apply server's targetX/targetZ only after grace window expires
 - For SELF: Do NOT overwrite isMoving from server (let client control based on distance to target)
 - For OPPONENT: Apply server's x/z/targetX/targetZ/isMoving for full server authority
