@@ -2815,10 +2815,16 @@ function selectMultiplayerMode(mode) {
         
         socket.on('connect', () => {
             console.log('Socket connected:', socket.id);
+            if (wasDisconnected && roomCode && myPlayerId) {
+                console.log('[REJOIN] Emitting rejoinRoom - roomCode:', roomCode, 'playerId:', myPlayerId);
+                socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+                wasDisconnected = false;
+            }
         });
         
         socket.on('disconnect', (reason) => {
             console.log('Socket disconnected:', reason);
+            wasDisconnected = true;
             if (reason === 'io server disconnect') {
                 socket.connect();
             }
@@ -2830,10 +2836,25 @@ function selectMultiplayerMode(mode) {
         
         socket.on('reconnect', (attemptNumber) => {
             console.log('Socket reconnected after', attemptNumber, 'attempts');
-            if (roomCode) {
+            if (roomCode && myPlayerId) {
+                console.log('[REJOIN] Emitting rejoinRoom from reconnect event');
                 socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
             }
         });
+        
+        socket.on('rejoinSuccess', (data) => {
+            console.log('[REJOIN] Successfully rejoined room:', data);
+        });
+        
+        if (socket.io) {
+            socket.io.on('reconnect', (attemptNumber) => {
+                console.log('[REJOIN][Manager] Reconnected after', attemptNumber, 'attempts');
+                if (roomCode && myPlayerId) {
+                    console.log('[REJOIN][Manager] Emitting rejoinRoom');
+                    socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+                }
+            });
+        }
         
         setupSocketListeners();
         
@@ -3032,10 +3053,16 @@ function joinRoom() {
         
         socket.on('connect', () => {
             console.log('Socket connected:', socket.id);
+            if (wasDisconnected && roomCode && myPlayerId) {
+                console.log('[REJOIN] Emitting rejoinRoom - roomCode:', roomCode, 'playerId:', myPlayerId);
+                socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+                wasDisconnected = false;
+            }
         });
         
         socket.on('disconnect', (reason) => {
             console.log('Socket disconnected:', reason);
+            wasDisconnected = true;
             if (reason === 'io server disconnect') {
                 socket.connect();
             }
@@ -3047,10 +3074,25 @@ function joinRoom() {
         
         socket.on('reconnect', (attemptNumber) => {
             console.log('Socket reconnected after', attemptNumber, 'attempts');
-            if (roomCode) {
+            if (roomCode && myPlayerId) {
+                console.log('[REJOIN] Emitting rejoinRoom from reconnect event');
                 socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
             }
         });
+        
+        socket.on('rejoinSuccess', (data) => {
+            console.log('[REJOIN] Successfully rejoined room:', data);
+        });
+        
+        if (socket.io) {
+            socket.io.on('reconnect', (attemptNumber) => {
+                console.log('[REJOIN][Manager] Reconnected after', attemptNumber, 'attempts');
+                if (roomCode && myPlayerId) {
+                    console.log('[REJOIN][Manager] Emitting rejoinRoom');
+                    socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+                }
+            });
+        }
         
         setupSocketListeners();
         
