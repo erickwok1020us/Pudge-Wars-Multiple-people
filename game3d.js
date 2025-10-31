@@ -2745,6 +2745,62 @@ function selectMultiplayerMode(mode) {
     console.log('[CREATE-ROOM] Rendering team-based UI for mode:', mode);
     renderTeamBasedUI(mode);
     
+    const setupSocketListeners = () => {
+        socket.off('roomCreated');
+        socket.once('roomCreated', (data) => {
+            myPlayerId = data.playerId;
+            console.log('[MP] Room created, playerId:', myPlayerId, 'mode:', mode);
+        });
+        
+        socket.off('roomState');
+        socket.on('roomState', (data) => {
+            console.log('[ROOM-STATE] Received room state update:', data);
+            updateTeamBasedUI(data);
+            updateStartButtonState();
+        });
+        
+        socket.off('teamSelectSuccess');
+        socket.on('teamSelectSuccess', (data) => {
+            console.log('[TEAM-SELECT] Team selection successful:', data.team);
+        });
+        
+        socket.off('teamSelectError');
+        socket.on('teamSelectError', (data) => {
+            console.log('[TEAM-SELECT] Team selection error:', data.message);
+            alert(data.message);
+        });
+        
+        socket.off('playerJoined');
+        socket.on('playerJoined', (data) => {
+            if (data.roomCode === roomCode) {
+                console.log('[MP] Player joined:', data);
+            }
+        });
+        
+        socket.off('playerReadyUpdate');
+        socket.on('playerReadyUpdate', (data) => {
+            console.log('[MP] Player ready update:', data);
+        });
+        
+        socket.off('gameStart');
+        socket.once('gameStart', () => {
+            console.log('[MP] gameStart event received (host)');
+            startMultiplayerGame();
+        });
+        
+        socket.off('hostDisconnected');
+        socket.on('hostDisconnected', (data) => {
+            console.log('[HOST-DISCONNECT] Host disconnected:', data.message);
+            alert(data.message || 'Host has left the room. Room is now closed.');
+            returnToMainMenu();
+        });
+    };
+    
+    const emitCreateRoom = () => {
+        console.log('[CREATE-ROOM] Emitting createRoom event');
+        socket.emit('createRoom', { roomCode: roomCode, gameMode: mode });
+    };
+    
     if (!socket) {
         const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
         socket = io(socketUrl, {
@@ -2775,58 +2831,23 @@ function selectMultiplayerMode(mode) {
                 socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
             }
         });
-    }
-    
-    socket.emit('createRoom', { roomCode: roomCode, gameMode: mode });
-    
-    socket.off('roomCreated');
-    socket.once('roomCreated', (data) => {
-        myPlayerId = data.playerId;
-        console.log('[MP] Room created, playerId:', myPlayerId, 'mode:', mode);
-    });
-    
-    socket.off('roomState');
-    socket.on('roomState', (data) => {
-        console.log('[ROOM-STATE] Received room state update:', data);
-        updateTeamBasedUI(data);
-        updateStartButtonState();
-    });
-    
-    socket.off('teamSelectSuccess');
-    socket.on('teamSelectSuccess', (data) => {
-        console.log('[TEAM-SELECT] Team selection successful:', data.team);
-    });
-    
-    socket.off('teamSelectError');
-    socket.on('teamSelectError', (data) => {
-        console.log('[TEAM-SELECT] Team selection error:', data.message);
-        alert(data.message);
-    });
-    
-    socket.off('playerJoined');
-    socket.on('playerJoined', (data) => {
-        if (data.roomCode === roomCode) {
-            console.log('[MP] Player joined:', data);
+        
+        setupSocketListeners();
+        
+        if (socket.connected) {
+            emitCreateRoom();
+        } else {
+            socket.once('connect', emitCreateRoom);
         }
-    });
-    
-    socket.off('playerReadyUpdate');
-    socket.on('playerReadyUpdate', (data) => {
-        console.log('[MP] Player ready update:', data);
-    });
-    
-    socket.off('gameStart');
-    socket.once('gameStart', () => {
-        console.log('[MP] gameStart event received (host)');
-        startMultiplayerGame();
-    });
-    
-    socket.off('hostDisconnected');
-    socket.on('hostDisconnected', (data) => {
-        console.log('[HOST-DISCONNECT] Host disconnected:', data.message);
-        alert(data.message || 'Host has left the room. Room is now closed.');
-        returnToMainMenu();
-    });
+    } else {
+        setupSocketListeners();
+        
+        if (socket.connected) {
+            emitCreateRoom();
+        } else {
+            socket.once('connect', emitCreateRoom);
+        }
+    }
     
     const startBtn = document.getElementById('startGameBtn');
     if (startBtn) {
@@ -2874,42 +2895,9 @@ function joinRoom() {
     
     statusDiv.innerHTML = '<p style="color: #4CAF50;">Connecting to room...</p>';
     
-    if (!socket) {
-        const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
-        socket = io(socketUrl, {
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 5,
-            transports: ['websocket', 'polling']
-        });
-        
-        socket.on('connect', () => {
-            console.log('Socket connected:', socket.id);
-        });
-        
-        socket.on('disconnect', (reason) => {
-            console.log('Socket disconnected:', reason);
-            if (reason === 'io server disconnect') {
-                socket.connect();
-            }
-        });
-        
-        socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-        });
-        
-        socket.on('reconnect', (attemptNumber) => {
-            console.log('Socket reconnected after', attemptNumber, 'attempts');
-            if (roomCode) {
-                socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
-            }
-        });
-    }
-    
-    socket.emit('joinRoom', { roomCode: inputCode });
-    
-    socket.off('joinSuccess');
-    socket.once('joinSuccess', (data) => {
+    const setupSocketListeners = () => {
+        socket.off('joinSuccess');
+        socket.once('joinSuccess', (data) => {
         if (data.roomCode === inputCode) {
             console.log('[JOIN-ROOM] joinSuccess received, hiding join interface, showing waiting room');
             
@@ -2974,55 +2962,109 @@ function joinRoom() {
             
             console.log('[JOIN-ROOM] Join success complete, waiting room displayed');
         }
-    });
+        });
+        
+        socket.off('roomState');
+        socket.on('roomState', (data) => {
+            console.log('[ROOM-STATE] Received room state update (guest):', data);
+            updateTeamBasedUI(data);
+            updateStartButtonState();
+        });
+        
+        socket.off('teamSelectSuccess');
+        socket.on('teamSelectSuccess', (data) => {
+            console.log('[TEAM-SELECT] Team selection successful:', data.team);
+        });
+        
+        socket.off('teamSelectError');
+        socket.on('teamSelectError', (data) => {
+            console.log('[TEAM-SELECT] Team selection error:', data.message);
+            alert(data.message);
+        });
+        
+        socket.off('playerReadyUpdate');
+        socket.on('playerReadyUpdate', (data) => {
+            console.log('[MP] Player ready update (guest):', data);
+        });
+        
+        socket.off('gameStart');
+        socket.once('gameStart', () => {
+            console.log('[MP] gameStart event received (guest)');
+            startMultiplayerGame();
+        });
+        
+        socket.off('hostDisconnected');
+        socket.on('hostDisconnected', (data) => {
+            console.log('[HOST-DISCONNECT] Host disconnected:', data.message);
+            alert(data.message || 'Host has left the room. Room is now closed.');
+            returnToMainMenu();
+        });
+        
+        socket.off('joinError');
+        socket.once('joinError', (data) => {
+            statusDiv.innerHTML = '<p style="color: #ff4444;">Room code does not exist, please try again</p>';
+            document.getElementById('roomCodeInput').value = '';
+        });
+        
+        socket.off('roomFull');
+        socket.once('roomFull', (data) => {
+            statusDiv.innerHTML = '<p style="color: #ff4444;">Room is full, please try another room code</p>';
+            document.getElementById('roomCodeInput').value = '';
+        });
+    };
     
-    socket.off('roomState');
-    socket.on('roomState', (data) => {
-        console.log('[ROOM-STATE] Received room state update (guest):', data);
-        updateTeamBasedUI(data);
-        updateStartButtonState();
-    });
+    const emitJoinRoom = () => {
+        console.log('[JOIN-ROOM] Emitting joinRoom event');
+        socket.emit('joinRoom', { roomCode: inputCode });
+    };
     
-    socket.off('teamSelectSuccess');
-    socket.on('teamSelectSuccess', (data) => {
-        console.log('[TEAM-SELECT] Team selection successful:', data.team);
-    });
-    
-    socket.off('teamSelectError');
-    socket.on('teamSelectError', (data) => {
-        console.log('[TEAM-SELECT] Team selection error:', data.message);
-        alert(data.message);
-    });
-    
-    socket.off('playerReadyUpdate');
-    socket.on('playerReadyUpdate', (data) => {
-        console.log('[MP] Player ready update (guest):', data);
-    });
-    
-    socket.off('gameStart');
-    socket.once('gameStart', () => {
-        console.log('[MP] gameStart event received (guest)');
-        startMultiplayerGame();
-    });
-    
-    socket.off('hostDisconnected');
-    socket.on('hostDisconnected', (data) => {
-        console.log('[HOST-DISCONNECT] Host disconnected:', data.message);
-        alert(data.message || 'Host has left the room. Room is now closed.');
-        returnToMainMenu();
-    });
-    
-    socket.off('joinError');
-    socket.once('joinError', (data) => {
-        statusDiv.innerHTML = '<p style="color: #ff4444;">Room code does not exist, please try again</p>';
-        document.getElementById('roomCodeInput').value = '';
-    });
-    
-    socket.off('roomFull');
-    socket.once('roomFull', (data) => {
-        statusDiv.innerHTML = '<p style="color: #ff4444;">Room is full, please try another room code</p>';
-        document.getElementById('roomCodeInput').value = '';
-    });
+    if (!socket) {
+        const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
+        socket = io(socketUrl, {
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5,
+            transports: ['websocket', 'polling']
+        });
+        
+        socket.on('connect', () => {
+            console.log('Socket connected:', socket.id);
+        });
+        
+        socket.on('disconnect', (reason) => {
+            console.log('Socket disconnected:', reason);
+            if (reason === 'io server disconnect') {
+                socket.connect();
+            }
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+        });
+        
+        socket.on('reconnect', (attemptNumber) => {
+            console.log('Socket reconnected after', attemptNumber, 'attempts');
+            if (roomCode) {
+                socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+            }
+        });
+        
+        setupSocketListeners();
+        
+        if (socket.connected) {
+            emitJoinRoom();
+        } else {
+            socket.once('connect', emitJoinRoom);
+        }
+    } else {
+        setupSocketListeners();
+        
+        if (socket.connected) {
+            emitJoinRoom();
+        } else {
+            socket.once('connect', emitJoinRoom);
+        }
+    }
 }
 
 function startPractice(mode = '1v1') {
