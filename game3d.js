@@ -2539,8 +2539,9 @@ function showCreateRoom() {
 let currentRoomState = null;
 
 function renderTeamBasedUI(mode) {
-    const team1Slots = document.getElementById('team1Slots');
-    const team2Slots = document.getElementById('team2Slots');
+    const waitingRoom = document.getElementById('waitingRoom');
+    const team1Slots = waitingRoom.querySelector('#team1Slots');
+    const team2Slots = waitingRoom.querySelector('#team2Slots');
     
     team1Slots.innerHTML = '';
     team2Slots.innerHTML = '';
@@ -2592,8 +2593,9 @@ function updateTeamBasedUI(roomState) {
         hostSocket
     });
     
-    const team1Slots = document.getElementById('team1Slots');
-    const team2Slots = document.getElementById('team2Slots');
+    const waitingRoom = document.getElementById('waitingRoom');
+    const team1Slots = waitingRoom.querySelector('#team1Slots');
+    const team2Slots = waitingRoom.querySelector('#team2Slots');
     
     if (!team1Slots || !team2Slots) {
         console.error('[UPDATE-UI] team1Slots or team2Slots not found!');
