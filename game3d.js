@@ -3125,7 +3125,8 @@ function toggleReady() {
 }
 
 function updateStartButtonState() {
-    const startBtn = document.getElementById('startGameBtn');
+    const waitingRoom = document.getElementById('waitingRoom');
+    const startBtn = waitingRoom?.querySelector('#startGameBtn');
     if (!startBtn) return;
     
     if (!currentRoomState || !socket) {
