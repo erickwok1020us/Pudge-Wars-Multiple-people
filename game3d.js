@@ -2477,6 +2477,7 @@ let opponentSocket = null;
 let isReady = false;
 let opponentReady = false;
 let myPlayerId = null;
+let wasDisconnected = false;
 
 function showMainMenu() {
     document.getElementById('mainMenu').style.display = 'flex';
