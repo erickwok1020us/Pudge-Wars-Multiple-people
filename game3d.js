@@ -2696,8 +2696,8 @@ function handleTeamSelect(team) {
         return;
     }
     
-    console.log('[TEAM-SELECT] Emitting selectTeam event for team:', team);
-    socket.emit('selectTeam', { roomCode, team });
+    console.log('[TEAM-SELECT] Emitting teamSelect event for team:', team);
+    socket.emit('teamSelect', { roomCode, team });
 }
 
 function selectMultiplayerMode(mode) {
