@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
     Mundo Cleaver - Main HTML File
-    Version: v430
+    Version: v433
     Last Updated: 2025-10-31
     
     Changes in v358:
@@ -891,9 +891,92 @@
             margin-top: 10px;
             font-size: 0.9em;
         }
+
+        /* State Management: Menu vs Game */
+        body[data-state="menu"] #gameContainer {
+            display: none !important;
+        }
+
+        body[data-state="menu"] .main-menu-video {
+            display: block !important;
+            opacity: 1 !important;
+        }
+
+        body[data-state="menu"] .latency-display,
+        body[data-state="menu"] .fps-display,
+        body[data-state="menu"] .cooldown-display,
+        body[data-state="menu"] .instructions,
+        body[data-state="menu"] #countdownOverlay,
+        body[data-state="menu"] #gameOverOverlay,
+        body[data-state="menu"] .health-bar-3d-dynamic {
+            display: none !important;
+        }
+
+        body[data-state="game"] .main-menu-video {
+            display: none !important;
+        }
+
+        body[data-state="game"] #gameContainer {
+            display: block !important;
+        }
+
+        /* Settings Interface Spacing Optimization */
+        #settingsInterface .game-title-image {
+            max-height: 80px !important;
+            margin-bottom: 8px !important;
+        }
+
+        #settingsInterface h2 {
+            margin-bottom: 16px !important;
+        }
+
+        #settingsInterface .room-content > div > div[style*="margin-bottom: 30px"] {
+            margin-bottom: 16px !important;
+        }
+
+        #settingsInterface .room-content > div > div[style*="margin-bottom: 20px"] {
+            margin-bottom: 12px !important;
+        }
+
+        #settingsInterface .room-content > div > div[style*="padding: 15px"] {
+            padding: 12px !important;
+        }
+
+        #settingsInterface .room-content p[style*="margin-top: 8px"] {
+            margin-top: 6px !important;
+        }
+
+        #settingsInterface .back-btn {
+            margin-top: 8px !important;
+        }
+
+        /* Mobile-specific tighter spacing */
+        @media (max-width: 600px) {
+            #settingsInterface .game-title-image {
+                max-height: 60px !important;
+                margin-bottom: 6px !important;
+            }
+
+            #settingsInterface h2 {
+                margin-bottom: 12px !important;
+                font-size: 1.3rem !important;
+            }
+
+            #settingsInterface .room-content > div > div[style*="margin-bottom: 30px"] {
+                margin-bottom: 12px !important;
+            }
+
+            #settingsInterface .room-content > div > div[style*="margin-bottom: 20px"] {
+                margin-bottom: 8px !important;
+            }
+
+            #settingsInterface .room-content > div > div[style*="padding: 15px"] {
+                padding: 10px !important;
+            }
+        }
     </style>
 </head>
-<body>
+<body data-state="menu">
     <!-- Initial Loading Screen (for FBX preload) -->
     <div id="initialLoadingScreen">
         <video autoplay muted loop playsinline>
@@ -945,6 +1028,60 @@
             <button class="menu-btn" onclick="playButtonClickSound(); showCreateRoom()">Create Room</button>
             <button class="menu-btn" onclick="playButtonClickSound(); showJoinRoom()">Join Room</button>
             <button class="menu-btn" onclick="playButtonClickSound(); showModeSelection()">Practise with AI</button>
+            <button class="menu-btn" onclick="playButtonClickSound(); showSettings()" style="font-size: 0.9rem; padding: 8px 16px; margin-top: 10px;">⚙️ Settings</button>
+        </div>
+    </div>
+
+    <div class="room-interface" id="settingsInterface" style="display: none;">
+        <div class="main-menu-overlay"></div>
+        <img src="Mundo-Cleaver-23-10-2025.gif" alt="Mundo-Cleaver" class="game-title-image">
+        <div class="room-content">
+            <h2 style="font-size: 1.5rem; margin-bottom: 30px;">⚙️ Settings</h2>
+            
+            <div style="max-width: 500px; margin: 0 auto; text-align: left;">
+                <!-- Brightness Setting -->
+                <div style="margin-bottom: 30px;">
+                    <label style="display: block; font-size: 1.1rem; margin-bottom: 10px; color: #fff;">
+                        🔆 Brightness: <span id="brightnessValue">1.0x</span>
+                    </label>
+                    <input type="range" id="brightnessSlider" min="50" max="200" value="100" step="10" 
+                           style="width: 100%; height: 8px; background: linear-gradient(to right, #444, #fff); border-radius: 5px; outline: none; cursor: pointer;"
+                           oninput="updateBrightnessSetting(this.value)">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #aaa; margin-top: 5px;">
+                        <span>Dark (0.5x)</span>
+                        <span>Normal (1.0x)</span>
+                        <span>Bright (2.0x)</span>
+                    </div>
+                </div>
+
+                <!-- Shadow Quality Setting -->
+                <div style="margin-bottom: 30px;">
+                    <label style="display: block; font-size: 1.1rem; margin-bottom: 10px; color: #fff;">
+                        💡 Shadow Quality
+                    </label>
+                    <select id="shadowQualitySelect" 
+                            style="width: 100%; padding: 12px; font-size: 1rem; background: rgba(0,0,0,0.7); color: #fff; border: 2px solid #666; border-radius: 8px; cursor: pointer;"
+                            onchange="updateShadowQualitySetting(this.value)">
+                        <option value="off">Off (Best Performance)</option>
+                        <option value="low">Low (512px)</option>
+                        <option value="medium" selected>Medium (1024px) - Recommended</option>
+                        <option value="high">High (2048px)</option>
+                    </select>
+                    <p style="font-size: 0.85rem; color: #aaa; margin-top: 8px; line-height: 1.4;">
+                        Higher quality shadows look better but may reduce performance on older devices.
+                    </p>
+                </div>
+
+                <!-- Current Settings Display -->
+                <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 20px;">
+                    <p style="font-size: 0.9rem; color: #aaa; margin: 0;">
+                        <strong>Current Device:</strong> <span id="deviceInfo">Detecting...</span><br>
+                        <strong>Auto-detected Quality:</strong> <span id="autoQuality">Medium</span>
+                    </p>
+                </div>
+            </div>
+
+            <button class="back-btn" onclick="showMainMenu()">← Back</button>
         </div>
     </div>
 
@@ -1221,6 +1358,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
-    <script src="game3d.js?v=432"></script>
+    <script src="game3d.js?v=441"></script>
 </body>
 </html>

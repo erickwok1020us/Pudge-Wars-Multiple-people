@@ -199,7 +199,19 @@ class MundoKnifeGame3D {
         this.lastMoveInputTime = 0;
         
         this.opponentSnapshots = [];
-        this.interpolationDelay = 100;
+        this.snapshotLimit = 32; // Increased from 10 for better buffering
+        
+        this.baseInterpolationDelay = 30; // Base delay in ms (reduced from 100ms)
+        this.interpolationDelay = 30;
+        this.minInterpolationDelay = 20;
+        this.maxInterpolationDelay = 70;
+        
+        this.networkStats = {
+            lastUpdateTimes: [],
+            jitter: 0,
+            avgInterArrival: 0,
+            lastAdaptiveUpdate: Date.now()
+        };
         
         this.eventListeners = {
             documentContextMenu: null,
@@ -220,6 +232,9 @@ class MundoKnifeGame3D {
             frames: 0,
             lastFpsUpdate: performance.now()
         };
+        
+        this.shadowConfig = this.detectShadowPreset();
+        console.log('[SHADOWS] Using preset:', this.shadowConfig.preset);
         
         this.showLoadingOverlay();
         
@@ -292,6 +307,65 @@ class MundoKnifeGame3D {
 
     getPlatformAdjustedTimestep() {
         return 0.008;
+    }
+    
+    detectShadowPreset() {
+        const savedQuality = localStorage.getItem('shadowQuality');
+        
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isTablet = /iPad|Android/i.test(navigator.userAgent) && window.innerWidth >= 768;
+        
+        const hasHighPerformance = window.devicePixelRatio <= 2 && !isMobile;
+        
+        const presets = {
+            off: {
+                preset: 'off',
+                enabled: false,
+                mapSize: 0,
+                type: null,
+                bias: 0,
+                normalBias: 0
+            },
+            low: {
+                preset: 'low',
+                enabled: true,
+                mapSize: 512,
+                type: THREE.BasicShadowMap,
+                bias: -0.001,
+                normalBias: 0.05
+            },
+            medium: {
+                preset: 'medium',
+                enabled: true,
+                mapSize: 1024,
+                type: THREE.PCFShadowMap,
+                bias: -0.0005,
+                normalBias: 0.02
+            },
+            high: {
+                preset: 'high',
+                enabled: true,
+                mapSize: 2048,
+                type: THREE.PCFSoftShadowMap,
+                bias: -0.0003,
+                normalBias: 0.01
+            }
+        };
+        
+        if (savedQuality && presets[savedQuality]) {
+            console.log('[SHADOW] Using saved quality:', savedQuality);
+            return presets[savedQuality];
+        }
+        
+        if (isMobile && !isTablet) {
+            return presets.off; // Mobile phones: shadows off for performance
+        } else if (isTablet) {
+            return presets.low; // Tablets: low quality shadows
+        } else if (hasHighPerformance) {
+            return presets.medium; // Desktop: medium quality shadows
+        } else {
+            return presets.low; // Lower-end desktop: low quality shadows
+        }
     }
 
     showLoadingOverlay() {
@@ -448,16 +522,21 @@ class MundoKnifeGame3D {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x000000);
         
+        const rect = this.container.getBoundingClientRect();
         this.camera = new THREE.PerspectiveCamera(
             75, 
-            window.innerWidth / window.innerHeight, 
+            rect.width / rect.height, 
             0.1, 
             10000
         );
         
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.shadowMap.enabled = false;
+        this.renderer.setSize(rect.width, rect.height, false);
+        this.renderer.shadowMap.enabled = this.shadowConfig.enabled;
+        if (this.shadowConfig.enabled) {
+            this.renderer.shadowMap.type = this.shadowConfig.type;
+            console.log('[SHADOWS] Renderer shadow map enabled with type:', this.shadowConfig.preset);
+        }
         this.canvas = this.renderer.domElement;
         this.container.appendChild(this.renderer.domElement);
         
@@ -466,12 +545,35 @@ class MundoKnifeGame3D {
     }
 
     setupLighting() {
-        const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
-        this.scene.add(ambientLight);
+        const savedBrightness = localStorage.getItem('gameBrightness');
+        this.brightnessLevel = savedBrightness ? parseFloat(savedBrightness) : 1.0;
+        
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 1.0 * this.brightnessLevel);
+        this.scene.add(this.ambientLight);
         
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
         directionalLight.position.set(50, 100, 50);
-        directionalLight.castShadow = false;
+        directionalLight.castShadow = this.shadowConfig.enabled;
+        
+        if (this.shadowConfig.enabled) {
+            directionalLight.shadow.mapSize.width = this.shadowConfig.mapSize;
+            directionalLight.shadow.mapSize.height = this.shadowConfig.mapSize;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            directionalLight.shadow.camera.left = -150;
+            directionalLight.shadow.camera.right = 150;
+            directionalLight.shadow.camera.top = 150;
+            directionalLight.shadow.camera.bottom = -150;
+            directionalLight.shadow.bias = this.shadowConfig.bias;
+            directionalLight.shadow.normalBias = this.shadowConfig.normalBias;
+            
+            console.log('[SHADOWS] Main light configured:', {
+                mapSize: this.shadowConfig.mapSize,
+                bias: this.shadowConfig.bias,
+                normalBias: this.shadowConfig.normalBias
+            });
+        }
+        
         this.scene.add(directionalLight);
         
         const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -505,6 +607,8 @@ class MundoKnifeGame3D {
                         child.material.color.set(0x4db8ff);
                         child.material.needsUpdate = true;
                     }
+                    child.receiveShadow = this.shadowConfig.enabled;
+                    child.castShadow = false;
                 }
             });
             
@@ -686,6 +790,8 @@ class MundoKnifeGame3D {
             currentLatency: 0,
             pingInterval: null
         };
+        
+        this.playersById = new Map();
 
         this.particles = [];
         this.characterSize = 10.5;
@@ -812,6 +918,11 @@ class MundoKnifeGame3D {
         this.team1.forEach(player => this.createPlayer3D(player));
         this.team2.forEach(player => this.createPlayer3D(player));
         
+        if (this.isMultiplayer && this.myPlayerId) {
+            this.playersById.set(this.myPlayerId, this.playerSelf);
+            console.log(`[PLAYERS-BY-ID] Registered playerSelf with ID: ${this.myPlayerId}`);
+        }
+        
         this.setupCamera();
         this.createHealthBarElements();
         this.updateHealthDisplay();
@@ -851,7 +962,15 @@ class MundoKnifeGame3D {
         const groundY = this.groundSurfaceY || 0;
         player.mesh.position.set(player.x, groundY, player.z);
         player.y = groundY;
-        player.mesh.castShadow = false;
+        player.mesh.castShadow = this.shadowConfig.enabled;
+        player.mesh.receiveShadow = this.shadowConfig.enabled;
+        
+        player.mesh.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = this.shadowConfig.enabled;
+                child.receiveShadow = this.shadowConfig.enabled;
+            }
+        });
         
         
         player.mixer = new THREE.AnimationMixer(player.mesh);
@@ -883,6 +1002,8 @@ class MundoKnifeGame3D {
         player.mesh.position.set(player.x, groundY + 5, player.z);
         player.y = groundY;
         player.mesh.rotation.y = player.facing === 1 ? Math.PI / 2 : -Math.PI / 2;
+        player.mesh.castShadow = this.shadowConfig.enabled;
+        player.mesh.receiveShadow = this.shadowConfig.enabled;
         
         this.playersRoot.add(player.mesh);
         player.mesh.visible = true;
@@ -1057,8 +1178,9 @@ class MundoKnifeGame3D {
             this.lastMouseClientX = e.clientX;
             this.lastMouseClientY = e.clientY;
             
-            this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-            this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            const rect = this.renderer.domElement.getBoundingClientRect();
+            this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
             
             this.raycaster.setFromCamera(this.mouse, this.camera);
             const intersects = this.raycaster.intersectObject(this.invisibleGround);
@@ -1083,8 +1205,9 @@ class MundoKnifeGame3D {
             return;
         }
         
-        const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-        const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         
         this.mouse.x = mouseX;
         this.mouse.y = mouseY;
@@ -1487,6 +1610,37 @@ class MundoKnifeGame3D {
         }
     }
     
+    updateAdaptiveInterpolationDelay() {
+        const now = Date.now();
+        if (now - this.networkStats.lastAdaptiveUpdate < 1000) return;
+        
+        if (this.networkStats.lastUpdateTimes.length < 5) return;
+        
+        const intervals = [];
+        for (let i = 1; i < this.networkStats.lastUpdateTimes.length; i++) {
+            intervals.push(this.networkStats.lastUpdateTimes[i] - this.networkStats.lastUpdateTimes[i - 1]);
+        }
+        
+        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const variance = intervals.reduce((sum, val) => sum + Math.pow(val - avgInterval, 2), 0) / intervals.length;
+        const jitter = Math.sqrt(variance);
+        
+        this.networkStats.avgInterArrival = avgInterval;
+        this.networkStats.jitter = jitter;
+        
+        const jitterCushion = jitter * 1.2;
+        const adaptiveDelay = Math.max(
+            this.minInterpolationDelay,
+            Math.min(
+                this.maxInterpolationDelay,
+                this.baseInterpolationDelay + jitterCushion
+            )
+        );
+        
+        this.interpolationDelay = adaptiveDelay;
+        this.networkStats.lastAdaptiveUpdate = now;
+    }
+
     interpolateOpponentPosition() {
         if (this.opponentSnapshots.length < 2) return;
         
@@ -1507,15 +1661,35 @@ class MundoKnifeGame3D {
         
         if (!snapshot0 || !snapshot1) {
             const latest = this.opponentSnapshots[this.opponentSnapshots.length - 1];
-            this.playerOpponent.x = latest.x;
-            this.playerOpponent.z = latest.z;
+            
+            if (this.opponentSnapshots.length >= 2) {
+                const prev = this.opponentSnapshots[this.opponentSnapshots.length - 2];
+                const dt = latest.timestamp - prev.timestamp;
+                
+                if (dt > 0 && dt < 200) {
+                    const vx = (latest.x - prev.x) / dt;
+                    const vz = (latest.z - prev.z) / dt;
+                    
+                    const extrapolationTime = Math.min(100, now - latest.timestamp);
+                    
+                    this.playerOpponent.x = latest.x + vx * extrapolationTime;
+                    this.playerOpponent.z = latest.z + vz * extrapolationTime;
+                } else {
+                    this.playerOpponent.x = latest.x;
+                    this.playerOpponent.z = latest.z;
+                }
+            } else {
+                this.playerOpponent.x = latest.x;
+                this.playerOpponent.z = latest.z;
+            }
+            
             this.playerOpponent.targetX = latest.targetX;
             this.playerOpponent.targetZ = latest.targetZ;
             this.playerOpponent.isMoving = latest.isMoving;
             
             if (this.playerOpponent.mesh) {
-                this.playerOpponent.mesh.position.x = latest.x;
-                this.playerOpponent.mesh.position.z = latest.z;
+                this.playerOpponent.mesh.position.x = this.playerOpponent.x;
+                this.playerOpponent.mesh.position.z = this.playerOpponent.z;
             }
             return;
         }
@@ -1805,8 +1979,9 @@ class MundoKnifeGame3D {
             );
             pos.project(this.camera);
             
-            const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
-            const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
+            const rect = this.renderer.domElement.getBoundingClientRect();
+            const x = (pos.x * 0.5 + 0.5) * rect.width;
+            const y = (-pos.y * 0.5 + 0.5) * rect.height;
             
             healthBar.style.left = (x - 43) + 'px';
             healthBar.style.top = (y - 10) + 'px';
@@ -1849,9 +2024,10 @@ class MundoKnifeGame3D {
     }
 
     onWindowResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
+        const rect = this.container.getBoundingClientRect();
+        this.camera.aspect = rect.width / rect.height;
         this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setSize(rect.width, rect.height, false);
     }
 
     startCountdown() {
@@ -1876,9 +2052,14 @@ class MundoKnifeGame3D {
             loadingVideo.style.display = 'none';
         }
         
-        this.playerSelf.knifeCooldown = 5000;
+        const instructions = document.querySelector('.instructions');
+        if (instructions) {
+            instructions.style.display = 'block';
+        }
+        
+        this.playerSelf.knifeCooldown = 4000;
         if (this.playerOpponent) {
-            this.playerOpponent.knifeCooldown = 5000;
+            this.playerOpponent.knifeCooldown = 4000;
         }
         this.playerSelf.lastKnifeTime = Date.now();
         if (this.playerOpponent) {
@@ -1923,9 +2104,9 @@ class MundoKnifeGame3D {
             } else {
                 countdownNumber.textContent = 'FIGHT!';
                 
-                this.playerSelf.knifeCooldown = 2200;
+                this.playerSelf.knifeCooldown = 4000;
                 if (this.playerOpponent) {
-                    this.playerOpponent.knifeCooldown = 2200;
+                    this.playerOpponent.knifeCooldown = 4000;
                 }
                 
                 setTimeout(() => {
@@ -1983,10 +2164,23 @@ class MundoKnifeGame3D {
     }
 
     applyServerHealthUpdate(data) {
-        console.log(`[SERVER-HEALTH] Applying authoritative update - targetTeam:${data.targetTeam} health:${data.health} isDead:${data.isDead}`);
+        console.log(`[SERVER-HEALTH] Applying authoritative update - targetPlayerId:${data.targetPlayerId} targetTeam:${data.targetTeam} health:${data.health} isDead:${data.isDead}`);
         
         const clampedHealth = Math.max(0, Math.min(data.health, 5));
         this.lastHealthByTeam[data.targetTeam] = clampedHealth;
+        
+        if (data.targetPlayerId && this.playersById.has(data.targetPlayerId)) {
+            const targetPlayer = this.playersById.get(data.targetPlayerId);
+            console.log(`[SERVER-HEALTH] Updating player ${data.targetPlayerId} health: ${targetPlayer.health} → ${clampedHealth}`);
+            targetPlayer.health = clampedHealth;
+            this.updateHealthDisplay();
+            
+            if (data.isDead && targetPlayer.health <= 0) {
+                console.log(`☠️ [SERVER-DEATH] Player ${data.targetPlayerId} has died (server confirmed)`);
+                this.handlePlayerDeath(targetPlayer);
+            }
+            return;
+        }
         
         if (data.targetTeam === this.myTeam) {
             console.log(`[SERVER-HEALTH] Updating playerSelf health: ${this.playerSelf.health} → ${clampedHealth}`);
@@ -2014,6 +2208,20 @@ class MundoKnifeGame3D {
     setupMultiplayerEvents() {
         if (!this.isMultiplayer || !socket) return;
         
+        console.log('[MP-EVENTS] Setting up multiplayer event listeners');
+        socket.off('opponentMove');
+        socket.off('serverKnifeSpawn');
+        socket.off('serverKnifeHit');
+        socket.off('serverKnifeDestroy');
+        socket.off('serverGameState');
+        socket.off('opponentKnifeThrow');
+        socket.off('serverHealthUpdate');
+        socket.off('opponentHealthUpdate');
+        socket.off('healthUpdate');
+        socket.off('playerHealthUpdate');
+        socket.off('playerLoadUpdate');
+        socket.off('allPlayersLoaded');
+        
         socket.on('opponentMove', (data) => {
             this.playerOpponent.targetX = data.targetX;
             this.playerOpponent.targetZ = data.targetZ;
@@ -2021,7 +2229,6 @@ class MundoKnifeGame3D {
         });
         
         socket.on('serverKnifeSpawn', (data) => {
-            console.log(`[SERVER-KNIFE] Knife spawned - knifeId:${data.knifeId} ownerTeam:${data.ownerTeam} actionId:${data.actionId}`);
             
             if (data.ownerTeam === this.myTeam && data.actionId) {
                 const predictedKnife = this.knives.find(k => k.actionId === data.actionId && k.isPredicted);
@@ -2049,7 +2256,6 @@ class MundoKnifeGame3D {
         });
         
         socket.on('serverKnifeHit', (data) => {
-            console.log(`[SERVER-KNIFE] Knife hit - knifeId:${data.knifeId} targetTeam:${data.targetTeam}`);
             
             this.createBloodEffect(data.hitX, 5, data.hitZ);
             
@@ -2070,7 +2276,6 @@ class MundoKnifeGame3D {
         });
         
         socket.on('serverKnifeDestroy', (data) => {
-            console.log(`[SERVER-KNIFE] Knife destroyed - knifeId:${data.knifeId}`);
             
             const knife = this.knives.find(k => k.knifeId === data.knifeId);
             if (knife) {
@@ -2086,6 +2291,13 @@ class MundoKnifeGame3D {
             if (data.players && data.players.length > 0) {
                 data.players.forEach(serverPlayer => {
                     const team = Number(serverPlayer.team);
+                    
+                    if (serverPlayer.playerId) {
+                        const localPlayer = this.playersById.get(serverPlayer.playerId);
+                        if (localPlayer && serverPlayer.health !== undefined) {
+                            localPlayer.health = serverPlayer.health;
+                        }
+                    }
                     
                     if (team === this.myTeam) {
                         const dx = this.playerSelf.x - serverPlayer.x;
@@ -2103,8 +2315,9 @@ class MundoKnifeGame3D {
                             this.playerSelf.targetZ = serverPlayer.targetZ;
                         }
                     } else if (team === this.opponentTeam) {
+                        const now = Date.now();
                         this.opponentSnapshots.push({
-                            timestamp: Date.now(),
+                            timestamp: now,
                             x: serverPlayer.x,
                             z: serverPlayer.z,
                             targetX: serverPlayer.targetX,
@@ -2112,9 +2325,16 @@ class MundoKnifeGame3D {
                             isMoving: serverPlayer.isMoving
                         });
                         
-                        if (this.opponentSnapshots.length > 10) {
+                        this.networkStats.lastUpdateTimes.push(now);
+                        if (this.networkStats.lastUpdateTimes.length > 20) {
+                            this.networkStats.lastUpdateTimes.shift();
+                        }
+                        
+                        if (this.opponentSnapshots.length > this.snapshotLimit) {
                             this.opponentSnapshots.shift();
                         }
+                        
+                        this.updateAdaptiveInterpolationDelay();
                     }
                 });
             }
@@ -2315,6 +2535,19 @@ class MundoKnifeGame3D {
         }
     }
 
+    setBrightness(level) {
+        this.brightnessLevel = Math.max(0.5, Math.min(2.0, level));
+        if (this.ambientLight) {
+            this.ambientLight.intensity = 1.0 * this.brightnessLevel;
+        }
+        localStorage.setItem('gameBrightness', this.brightnessLevel.toString());
+        console.log('[BRIGHTNESS] Set to:', this.brightnessLevel);
+    }
+
+    getBrightness() {
+        return this.brightnessLevel || 1.0;
+    }
+
     dispose() {
         console.log('[DISPOSE] Cleaning up game instance');
         this.gameState.isRunning = false;
@@ -2344,6 +2577,28 @@ class MundoKnifeGame3D {
         }
         
         this.hideLoadingOverlay();
+        
+        console.log('[DISPOSE] Cleaning up DOM elements');
+        document.querySelectorAll('.health-bar-3d-dynamic').forEach(el => el.remove());
+        
+        const hudElements = [
+            document.querySelector('.latency-display'),
+            document.querySelector('.fps-display'),
+            document.querySelector('.cooldown-display')
+        ];
+        hudElements.forEach(el => {
+            if (el) el.style.display = 'none';
+        });
+        
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        if (gameOverOverlay) {
+            gameOverOverlay.style.display = 'none';
+        }
+        
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        if (countdownOverlay) {
+            countdownOverlay.style.display = 'none';
+        }
         
         if (this.playersRoot) {
             console.log('[DISPOSE] Removing playersRoot group');
@@ -2420,6 +2675,9 @@ function restartGame() {
 function returnToMainMenu() {
     console.log('[MENU] Returning to main menu');
     
+    document.body.dataset.state = 'menu';
+    console.log('[STATE] Set body state to: menu');
+    
     document.getElementById('gameOverOverlay').style.display = 'none';
     
     const gameContainer = document.getElementById('gameContainer');
@@ -2480,6 +2738,9 @@ let myPlayerId = null;
 let wasDisconnected = false;
 
 function showMainMenu() {
+    document.body.dataset.state = 'menu';
+    console.log('[STATE] Ensuring body state is: menu');
+    
     document.getElementById('mainMenu').style.display = 'flex';
     document.getElementById('modeSelectionInterface').style.display = 'none';
     document.getElementById('createRoomInterface').style.display = 'none';
@@ -2489,6 +2750,35 @@ function showMainMenu() {
     const waitingRoom = document.getElementById('waitingRoom');
     if (waitingRoom) {
         waitingRoom.style.display = 'none';
+    }
+    
+    console.log('[MENU] Cleaning up game HUD elements');
+    document.querySelectorAll('.health-bar-3d-dynamic').forEach(el => el.remove());
+    
+    const hudElements = [
+        document.querySelector('.latency-display'),
+        document.querySelector('.fps-display'),
+        document.querySelector('.cooldown-display'),
+        document.querySelector('.instructions')
+    ];
+    hudElements.forEach(el => {
+        if (el) el.style.display = 'none';
+    });
+    
+    const gameOverOverlay = document.getElementById('gameOverOverlay');
+    if (gameOverOverlay) {
+        gameOverOverlay.style.display = 'none';
+    }
+    
+    const countdownOverlay = document.getElementById('countdownOverlay');
+    if (countdownOverlay) {
+        countdownOverlay.style.display = 'none';
+    }
+    
+    const mainMenuVideo = document.querySelector('.main-menu-video');
+    if (mainMenuVideo) {
+        mainMenuVideo.style.display = 'block';
+        mainMenuVideo.style.opacity = '1';
     }
     
     if (currentGame) {
@@ -2515,11 +2805,99 @@ function showMainMenu() {
     opponentReady = false;
     myPlayerId = null;
     
-    resumeMainMenuAudio(); // (important-comment)
+    resumeMainMenuAudio();// (important-comment)
+}
+
+function showSettings() {
+    document.getElementById('mainMenu').style.display = 'none';
+    document.getElementById('settingsInterface').style.display = 'flex';
+    document.getElementById('modeSelectionInterface').style.display = 'none';
+    document.getElementById('createRoomInterface').style.display = 'none';
+    document.getElementById('joinRoomInterface').style.display = 'none';
+    document.getElementById('gameContainer').style.display = 'none';
+    
+    const savedBrightness = localStorage.getItem('gameBrightness') || '1.0';
+    const savedShadowQuality = localStorage.getItem('shadowQuality') || 'medium';
+    
+    const brightnessSlider = document.getElementById('brightnessSlider');
+    const shadowQualitySelect = document.getElementById('shadowQualitySelect');
+    
+    if (brightnessSlider) {
+        brightnessSlider.value = parseFloat(savedBrightness) * 100;
+        updateBrightnessDisplay(parseFloat(savedBrightness));
+    }
+    
+    if (shadowQualitySelect) {
+        shadowQualitySelect.value = savedShadowQuality;
+    }
+    
+    updateDeviceInfo();
+}
+
+function updateBrightnessSetting(value) {
+    const brightness = value / 100;
+    updateBrightnessDisplay(brightness);
+    localStorage.setItem('gameBrightness', brightness.toString());
+    
+    if (currentGame && currentGame.ambientLight) {
+        currentGame.setBrightness(brightness);
+    }
+}
+
+function updateBrightnessDisplay(brightness) {
+    const brightnessValue = document.getElementById('brightnessValue');
+    if (brightnessValue) {
+        brightnessValue.textContent = brightness.toFixed(1) + 'x';
+    }
+}
+
+function updateShadowQualitySetting(quality) {
+    localStorage.setItem('shadowQuality', quality);
+    console.log('[SETTINGS] Shadow quality set to:', quality);
+    
+    const qualityNames = {
+        'off': 'Off',
+        'low': 'Low (512px)',
+        'medium': 'Medium (1024px)',
+        'high': 'High (2048px)'
+    };
+    
+    alert(`Shadow quality set to: ${qualityNames[quality]}\n\nThis will take effect when you start a new game.`);
+}
+
+function updateDeviceInfo() {
+    const deviceInfo = document.getElementById('deviceInfo');
+    const autoQuality = document.getElementById('autoQuality');
+    
+    if (!deviceInfo || !autoQuality) return;
+    
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isTablet = /iPad|Android/i.test(navigator.userAgent) && window.innerWidth >= 768;
+    
+    let deviceType = 'Desktop';
+    let recommendedQuality = 'Medium';
+    
+    if (isMobile && !isTablet) {
+        deviceType = 'Mobile Phone';
+        recommendedQuality = 'Off';
+    } else if (isTablet) {
+        deviceType = 'Tablet';
+        recommendedQuality = 'Low';
+    } else if (window.devicePixelRatio <= 2) {
+        deviceType = 'Desktop (High Performance)';
+        recommendedQuality = 'Medium';
+    } else {
+        deviceType = 'Desktop';
+        recommendedQuality = 'Low';
+    }
+    
+    deviceInfo.textContent = deviceType;
+    autoQuality.textContent = recommendedQuality;
 }
 
 function showModeSelection() {
     document.getElementById('mainMenu').style.display = 'none';
+    document.getElementById('settingsInterface').style.display = 'none';
     document.getElementById('modeSelectionInterface').style.display = 'flex';
     document.getElementById('createRoomInterface').style.display = 'none';
     document.getElementById('joinRoomInterface').style.display = 'none';
@@ -2705,6 +3083,8 @@ function handleTeamSelect(team) {
 
 function selectMultiplayerMode(mode) {
     practiceMode = mode;
+    isHost = true;
+    isReady = false;
     
     console.log('[CREATE-ROOM] Hiding mode selection, showing waiting room');
     
@@ -2805,12 +3185,12 @@ function selectMultiplayerMode(mode) {
     };
     
     if (!socket) {
-        const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
+        const socketUrl = 'http://localhost:3000';
         socket = io(socketUrl, {
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionAttempts: 5,
-            transports: ['websocket', 'polling']
+            transports: ['websocket']
         });
         
         socket.on('connect', () => {
@@ -2819,6 +3199,11 @@ function selectMultiplayerMode(mode) {
                 console.log('[REJOIN] Emitting rejoinRoom - roomCode:', roomCode, 'playerId:', myPlayerId);
                 socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
                 wasDisconnected = false;
+                
+                if (currentGame && currentGame.isMultiplayer) {
+                    console.log('[REJOIN] Rebinding multiplayer event listeners (host)');
+                    currentGame.setupMultiplayerEvents();
+                }
             }
         });
         
@@ -2839,6 +3224,11 @@ function selectMultiplayerMode(mode) {
             if (roomCode && myPlayerId) {
                 console.log('[REJOIN] Emitting rejoinRoom from reconnect event');
                 socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+                
+                if (currentGame && currentGame.isMultiplayer) {
+                    console.log('[REJOIN] Rebinding multiplayer event listeners from reconnect (host)');
+                    currentGame.setupMultiplayerEvents();
+                }
             }
         });
         
@@ -2852,6 +3242,11 @@ function selectMultiplayerMode(mode) {
                 if (roomCode && myPlayerId) {
                     console.log('[REJOIN][Manager] Emitting rejoinRoom');
                     socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+                    
+                    if (currentGame && currentGame.isMultiplayer) {
+                        console.log('[REJOIN][Manager] Rebinding multiplayer event listeners (host)');
+                        currentGame.setupMultiplayerEvents();
+                    }
                 }
             });
         }
@@ -3043,12 +3438,12 @@ function joinRoom() {
     };
     
     if (!socket) {
-        const socketUrl = 'https://mundo-cleaver-socket-server.onrender.com';
+        const socketUrl = 'http://localhost:3000';
         socket = io(socketUrl, {
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionAttempts: 5,
-            transports: ['websocket', 'polling']
+            transports: ['websocket']
         });
         
         socket.on('connect', () => {
@@ -3057,6 +3452,11 @@ function joinRoom() {
                 console.log('[REJOIN] Emitting rejoinRoom - roomCode:', roomCode, 'playerId:', myPlayerId);
                 socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
                 wasDisconnected = false;
+                
+                if (currentGame && currentGame.isMultiplayer) {
+                    console.log('[REJOIN] Rebinding multiplayer event listeners (guest)');
+                    currentGame.setupMultiplayerEvents();
+                }
             }
         });
         
@@ -3077,6 +3477,11 @@ function joinRoom() {
             if (roomCode && myPlayerId) {
                 console.log('[REJOIN] Emitting rejoinRoom from reconnect event');
                 socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+                
+                if (currentGame && currentGame.isMultiplayer) {
+                    console.log('[REJOIN] Rebinding multiplayer event listeners from reconnect (guest)');
+                    currentGame.setupMultiplayerEvents();
+                }
             }
         });
         
@@ -3090,6 +3495,11 @@ function joinRoom() {
                 if (roomCode && myPlayerId) {
                     console.log('[REJOIN][Manager] Emitting rejoinRoom');
                     socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
+                    
+                    if (currentGame && currentGame.isMultiplayer) {
+                        console.log('[REJOIN][Manager] Rebinding multiplayer event listeners (guest)');
+                        currentGame.setupMultiplayerEvents();
+                    }
                 }
             });
         }
@@ -3222,6 +3632,9 @@ function startGame(isMultiplayer = false) {
     }
     
     window.__gameStarted = true;
+    
+    document.body.dataset.state = 'game';
+    console.log('[STATE] Set body state to: game');
     
     document.getElementById('mainMenu').style.display = 'none';
     document.getElementById('modeSelectionInterface').style.display = 'none';
