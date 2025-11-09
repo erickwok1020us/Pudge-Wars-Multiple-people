@@ -3132,7 +3132,8 @@ function selectMultiplayerMode(mode) {
         socket.off('roomCreated');
         socket.once('roomCreated', (data) => {
             myPlayerId = data.playerId;
-            console.log('[MP] Room created, playerId:', myPlayerId, 'mode:', mode);
+            myTeam = data.team; // Store the team information
+            console.log('[MP] Room created, playerId:', myPlayerId, 'team:', data.team, 'mode:', mode);
         });
         
         socket.off('roomState');
@@ -3185,7 +3186,9 @@ function selectMultiplayerMode(mode) {
     };
     
     if (!socket) {
-        const socketUrl = 'http://localhost:3000';
+        const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:3000' 
+            : `${window.location.protocol}//${window.location.hostname}:3000`;
         socket = io(socketUrl, {
             reconnection: true,
             reconnectionDelay: 1000,
@@ -3438,7 +3441,9 @@ function joinRoom() {
     };
     
     if (!socket) {
-        const socketUrl = 'http://localhost:3000';
+        const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:3000' 
+            : `${window.location.protocol}//${window.location.hostname}:3000`;
         socket = io(socketUrl, {
             reconnection: true,
             reconnectionDelay: 1000,
