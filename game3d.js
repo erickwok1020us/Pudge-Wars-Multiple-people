@@ -3186,14 +3186,18 @@ function selectMultiplayerMode(mode) {
     };
     
     if (!socket) {
-        const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-            ? 'http://localhost:3000' 
-            : `${window.location.protocol}//${window.location.hostname}:3000`;
+        const override = (window.__SOCKET_URL || document.querySelector('meta[name="socket-url"]')?.content || '').trim();
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const socketUrl = override || (isLocal ? 'http://localhost:3000' : undefined);
+        
+        console.log('[SOCKET] Attempting connection to:', socketUrl || '(same-origin)', 'path:/socket.io');
+        
         socket = io(socketUrl, {
+            path: '/socket.io',
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionAttempts: 5,
-            transports: ['websocket']
+            transports: ['websocket', 'polling']
         });
         
         socket.on('connect', () => {
@@ -3219,7 +3223,9 @@ function selectMultiplayerMode(mode) {
         });
         
         socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
+            console.error('[SOCKET] connect_error:', error?.message || error);
+            const statusEl = document.querySelector('.connecting-status, #connectingStatus');
+            if (statusEl) statusEl.textContent = `Connection failed: ${error?.message || 'unknown error'}`;
         });
         
         socket.on('reconnect', (attemptNumber) => {
@@ -3441,14 +3447,18 @@ function joinRoom() {
     };
     
     if (!socket) {
-        const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-            ? 'http://localhost:3000' 
-            : `${window.location.protocol}//${window.location.hostname}:3000`;
+        const override = (window.__SOCKET_URL || document.querySelector('meta[name="socket-url"]')?.content || '').trim();
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const socketUrl = override || (isLocal ? 'http://localhost:3000' : undefined);
+        
+        console.log('[SOCKET] Attempting connection to:', socketUrl || '(same-origin)', 'path:/socket.io');
+        
         socket = io(socketUrl, {
+            path: '/socket.io',
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionAttempts: 5,
-            transports: ['websocket']
+            transports: ['websocket', 'polling']
         });
         
         socket.on('connect', () => {
@@ -3474,7 +3484,9 @@ function joinRoom() {
         });
         
         socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
+            console.error('[SOCKET] connect_error:', error?.message || error);
+            const statusEl = document.querySelector('.connecting-status, #connectingStatus');
+            if (statusEl) statusEl.textContent = `Connection failed: ${error?.message || 'unknown error'}`;
         });
         
         socket.on('reconnect', (attemptNumber) => {
