@@ -210,8 +210,15 @@ class MundoKnifeGame3D {
             lastUpdateTimes: [],
             jitter: 0,
             avgInterArrival: 0,
-            lastAdaptiveUpdate: Date.now()
+            lastAdaptiveUpdate: Date.now(),
+            interArrivalTimes: [],
+            p50: 0,
+            p95: 0,
+            p99: 0
         };
+        
+        this.debugSync = false;
+        this.serverTimeOffset = 0;
         
         this.eventListeners = {
             documentContextMenu: null,
@@ -1137,20 +1144,19 @@ class MundoKnifeGame3D {
     }
 
     setupEventListeners() {
-        this.eventListeners.documentContextMenu = (e) => {
-            if (e.target !== this.renderer.domElement) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        };
-        document.addEventListener('contextmenu', this.eventListeners.documentContextMenu, true);
-        
         this.eventListeners.canvasContextMenu = (e) => {
             e.preventDefault();
             e.stopPropagation();
             this.handlePlayerMovement(e);
         };
         this.renderer.domElement.addEventListener('contextmenu', this.eventListeners.canvasContextMenu, true);
+        
+        this.eventListeners.documentContextMenu = (e) => {
+            if (e.target !== this.renderer.domElement) {
+                e.preventDefault();
+            }
+        };
+        document.addEventListener('contextmenu', this.eventListeners.documentContextMenu, false);
         
         this.eventListeners.keydown = (e) => {
             this.keys[e.key.toLowerCase()] = true;
@@ -1277,11 +1283,14 @@ class MundoKnifeGame3D {
                     predictedKnife.isPredicted = true;
                 }
                 
+                // Include clientTimestamp for lag compensation
+                const clientTimestamp = Date.now() - this.serverTimeOffset;
                 socket.emit('knifeThrow', {
                     roomCode: roomCode,
                     targetX: targetX,
                     targetZ: targetZ,
-                    actionId: actionId
+                    actionId: actionId,
+                    clientTimestamp: clientTimestamp
                 });
             } else {
                 this.createKnife3DTowards(this.playerSelf, targetX, targetZ, this.raycaster.ray.direction, knifeAudio);
@@ -1644,8 +1653,8 @@ class MundoKnifeGame3D {
     interpolateOpponentPosition() {
         if (this.opponentSnapshots.length < 2) return;
         
-        const now = Date.now();
-        const renderTime = now - this.interpolationDelay;
+        const serverNow = Date.now() - this.serverTimeOffset;
+        const renderTime = serverNow - this.interpolationDelay;
         
         let snapshot0 = null;
         let snapshot1 = null;
@@ -1661,6 +1670,10 @@ class MundoKnifeGame3D {
         
         if (!snapshot0 || !snapshot1) {
             const latest = this.opponentSnapshots[this.opponentSnapshots.length - 1];
+            
+            if (this.debugSync) {
+                console.log(`[SYNC-DEBUG] Extrapolating - renderTime:${renderTime}, latestTimestamp:${latest.timestamp}, behind:${serverNow - latest.timestamp}ms`);
+            }
             
             if (this.opponentSnapshots.length >= 2) {
                 const prev = this.opponentSnapshots[this.opponentSnapshots.length - 2];
@@ -1690,6 +1703,10 @@ class MundoKnifeGame3D {
             if (this.playerOpponent.mesh) {
                 this.playerOpponent.mesh.position.x = this.playerOpponent.x;
                 this.playerOpponent.mesh.position.z = this.playerOpponent.z;
+                
+                if (this.debugSync) {
+                    console.log(`[SYNC-DEBUG] Applied extrapolated position to mesh - x:${this.playerOpponent.x.toFixed(2)}, z:${this.playerOpponent.z.toFixed(2)}`);
+                }
             }
             return;
         }
@@ -1701,6 +1718,10 @@ class MundoKnifeGame3D {
         const interpolatedX = snapshot0.x + (snapshot1.x - snapshot0.x) * clampedT;
         const interpolatedZ = snapshot0.z + (snapshot1.z - snapshot0.z) * clampedT;
         
+        if (this.debugSync) {
+            console.log(`[SYNC-DEBUG] Interpolating - renderTime:${renderTime}, s0:${snapshot0.timestamp}, s1:${snapshot1.timestamp}, t:${clampedT.toFixed(3)}, x:${interpolatedX.toFixed(2)}, z:${interpolatedZ.toFixed(2)}`);
+        }
+        
         this.playerOpponent.x = interpolatedX;
         this.playerOpponent.z = interpolatedZ;
         this.playerOpponent.targetX = snapshot1.targetX;
@@ -1710,6 +1731,10 @@ class MundoKnifeGame3D {
         if (this.playerOpponent.mesh) {
             this.playerOpponent.mesh.position.x = interpolatedX;
             this.playerOpponent.mesh.position.z = interpolatedZ;
+            
+            if (this.debugSync) {
+                console.log(`[SYNC-DEBUG] Applied interpolated position to mesh - x:${interpolatedX.toFixed(2)}, z:${interpolatedZ.toFixed(2)}`);
+            }
         }
     }
 
@@ -2275,6 +2300,32 @@ class MundoKnifeGame3D {
             }
         });
         
+        // Phase 3: Movement reconciliation with server acknowledgments
+        socket.on('serverMoveAck', (data) => {
+            if (!data.actionId) return;
+            
+            // Server has acknowledged movement, reconcile if needed
+            const serverX = data.x;
+            const serverZ = data.z;
+            const errorThreshold = 5.0; // Allow 5 units of error before reconciling
+            
+            const errorDist = Math.sqrt(
+                Math.pow(this.playerSelf.x - serverX, 2) + 
+                Math.pow(this.playerSelf.z - serverZ, 2)
+            );
+            
+            if (errorDist > errorThreshold) {
+                console.log(`[MOVE-RECONCILE] Position mismatch detected: ${errorDist.toFixed(2)} units, correcting to server position`);
+                this.playerSelf.x = serverX;
+                this.playerSelf.z = serverZ;
+                
+                if (this.playerSelf.mesh) {
+                    this.playerSelf.mesh.position.x = serverX;
+                    this.playerSelf.mesh.position.z = serverZ;
+                }
+            }
+        });
+        
         socket.on('serverKnifeDestroy', (data) => {
             
             const knife = this.knives.find(k => k.knifeId === data.knifeId);
@@ -2288,9 +2339,21 @@ class MundoKnifeGame3D {
         });
         
         socket.on('serverGameState', (data) => {
+            if (this.debugSync && data.serverTime) {
+                const clientTime = Date.now();
+                const offset = clientTime - data.serverTime;
+                if (Math.abs(offset - this.serverTimeOffset) > 5) {
+                    console.log(`[SYNC-DEBUG] serverTime: ${data.serverTime}, clientTime: ${clientTime}, offset: ${offset}ms`);
+                }
+            }
+            
             if (data.players && data.players.length > 0) {
                 data.players.forEach(serverPlayer => {
                     const team = Number(serverPlayer.team);
+                    
+                    if (this.debugSync && team === this.opponentTeam) {
+                        console.log(`[SYNC-DEBUG] Received opponent data - team:${team}, x:${serverPlayer.x.toFixed(2)}, z:${serverPlayer.z.toFixed(2)}, serverTime:${data.serverTime}`);
+                    }
                     
                     if (serverPlayer.playerId) {
                         const localPlayer = this.playersById.get(serverPlayer.playerId);
@@ -2316,8 +2379,12 @@ class MundoKnifeGame3D {
                         }
                     } else if (team === this.opponentTeam) {
                         const now = Date.now();
+                        
+                        const rawOffset = now - data.serverTime;
+                        this.serverTimeOffset = this.serverTimeOffset * 0.9 + rawOffset * 0.1;
+                        
                         this.opponentSnapshots.push({
-                            timestamp: now,
+                            timestamp: data.serverTime,
                             x: serverPlayer.x,
                             z: serverPlayer.z,
                             targetX: serverPlayer.targetX,
@@ -2325,9 +2392,32 @@ class MundoKnifeGame3D {
                             isMoving: serverPlayer.isMoving
                         });
                         
+                        if (this.debugSync) {
+                            console.log(`[SYNC-DEBUG] Pushed snapshot - count:${this.opponentSnapshots.length}, serverTime:${data.serverTime}, offset:${this.serverTimeOffset.toFixed(2)}ms, first:${this.opponentSnapshots[0].timestamp}, last:${this.opponentSnapshots[this.opponentSnapshots.length-1].timestamp}`);
+                        }
+                        
                         this.networkStats.lastUpdateTimes.push(now);
                         if (this.networkStats.lastUpdateTimes.length > 20) {
                             this.networkStats.lastUpdateTimes.shift();
+                        }
+                        
+                        // Calculate inter-arrival times for jitter measurement
+                        if (this.networkStats.lastUpdateTimes.length >= 2) {
+                            const lastIdx = this.networkStats.lastUpdateTimes.length - 1;
+                            const interArrival = this.networkStats.lastUpdateTimes[lastIdx] - this.networkStats.lastUpdateTimes[lastIdx - 1];
+                            this.networkStats.interArrivalTimes.push(interArrival);
+                            if (this.networkStats.interArrivalTimes.length > 100) {
+                                this.networkStats.interArrivalTimes.shift();
+                            }
+                            
+                            // Calculate percentiles every 50 samples
+                            if (this.networkStats.interArrivalTimes.length >= 50 && this.networkStats.interArrivalTimes.length % 50 === 0) {
+                                const sorted = [...this.networkStats.interArrivalTimes].sort((a, b) => a - b);
+                                this.networkStats.p50 = sorted[Math.floor(sorted.length * 0.5)];
+                                this.networkStats.p95 = sorted[Math.floor(sorted.length * 0.95)];
+                                this.networkStats.p99 = sorted[Math.floor(sorted.length * 0.99)];
+                                console.log(`[JITTER] p50: ${this.networkStats.p50.toFixed(1)}ms, p95: ${this.networkStats.p95.toFixed(1)}ms, p99: ${this.networkStats.p99.toFixed(1)}ms`);
+                            }
                         }
                         
                         if (this.opponentSnapshots.length > this.snapshotLimit) {
@@ -3197,11 +3287,24 @@ function selectMultiplayerMode(mode) {
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionAttempts: 5,
-            transports: ['websocket', 'polling']
+            transports: ['websocket'],
+            upgrade: false
         });
         
         socket.on('connect', () => {
             console.log('Socket connected:', socket.id);
+            
+            // Log transport diagnostics
+            if (socket.io && socket.io.engine) {
+                const transport = socket.io.engine.transport.name;
+                console.log(`[TRANSPORT] Connected using: ${transport}`);
+                
+                // Send transport info to server
+                socket.emit('clientTransportInfo', {
+                    transport: transport,
+                    latency: 0
+                });
+            }
             if (wasDisconnected && roomCode && myPlayerId) {
                 console.log('[REJOIN] Emitting rejoinRoom - roomCode:', roomCode, 'playerId:', myPlayerId);
                 socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
@@ -3458,11 +3561,24 @@ function joinRoom() {
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionAttempts: 5,
-            transports: ['websocket', 'polling']
+            transports: ['websocket'],
+            upgrade: false
         });
         
         socket.on('connect', () => {
             console.log('Socket connected:', socket.id);
+            
+            // Log transport diagnostics
+            if (socket.io && socket.io.engine) {
+                const transport = socket.io.engine.transport.name;
+                console.log(`[TRANSPORT] Connected using: ${transport}`);
+                
+                // Send transport info to server
+                socket.emit('clientTransportInfo', {
+                    transport: transport,
+                    latency: 0
+                });
+            }
             if (wasDisconnected && roomCode && myPlayerId) {
                 console.log('[REJOIN] Emitting rejoinRoom - roomCode:', roomCode, 'playerId:', myPlayerId);
                 socket.emit('rejoinRoom', { roomCode, playerId: myPlayerId });
