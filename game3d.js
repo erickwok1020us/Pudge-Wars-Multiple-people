@@ -220,6 +220,16 @@ class MundoKnifeGame3D {
         this.debugSync = false;
         this.serverTimeOffset = 0;
         
+        this.NETCODE = {
+            prediction: true,
+            reconciliation: true,
+            lagComp: true
+        };
+        
+        this.timeSync = null;
+        this.inputBuffer = null;
+        this.reconciler = null;
+        
         this.eventListeners = {
             documentContextMenu: null,
             canvasContextMenu: null,
@@ -1230,20 +1240,46 @@ class MundoKnifeGame3D {
                 return;
             }
             
-            this.playerSelf.targetX = point.x;
-            this.playerSelf.targetZ = point.z;
-            this.playerSelf.isMoving = true;
-            
             if (this.isMultiplayer && socket) {
                 this.lastMoveInputTime = Date.now();
                 const actionId = `${Date.now()}-${Math.random()}`;
                 
-                socket.emit('playerMove', {
-                    roomCode: roomCode,
-                    targetX: point.x,
-                    targetZ: point.z,
-                    actionId: actionId
-                });
+                if (this.NETCODE.prediction && this.inputBuffer) {
+                    const seq = this.inputBuffer.addInput({
+                        targetX: point.x,
+                        targetZ: point.z
+                    });
+                    
+                    this.playerSelf.targetX = point.x;
+                    this.playerSelf.targetZ = point.z;
+                    this.playerSelf.isMoving = true;
+                    
+                    const clientTime = this.timeSync ? this.timeSync.getServerTime() : Date.now();
+                    
+                    socket.emit('playerMove', {
+                        roomCode: roomCode,
+                        targetX: point.x,
+                        targetZ: point.z,
+                        actionId: actionId,
+                        seq: seq,
+                        clientTime: clientTime
+                    });
+                } else {
+                    this.playerSelf.targetX = point.x;
+                    this.playerSelf.targetZ = point.z;
+                    this.playerSelf.isMoving = true;
+                    
+                    socket.emit('playerMove', {
+                        roomCode: roomCode,
+                        targetX: point.x,
+                        targetZ: point.z,
+                        actionId: actionId
+                    });
+                }
+            } else {
+                this.playerSelf.targetX = point.x;
+                this.playerSelf.targetZ = point.z;
+                this.playerSelf.isMoving = true;
             }
         }
     }
@@ -1284,7 +1320,7 @@ class MundoKnifeGame3D {
                 }
                 
                 // Include clientTimestamp for lag compensation
-                const clientTimestamp = Date.now() - this.serverTimeOffset;
+                const clientTimestamp = this.timeSync ? this.timeSync.getServerTime() : Date.now();
                 socket.emit('knifeThrow', {
                     roomCode: roomCode,
                     targetX: targetX,
@@ -1683,7 +1719,7 @@ class MundoKnifeGame3D {
                     const vx = (latest.x - prev.x) / dt;
                     const vz = (latest.z - prev.z) / dt;
                     
-                    const extrapolationTime = Math.min(100, now - latest.timestamp);
+                    const extrapolationTime = Math.min(100, serverNow - latest.timestamp);
                     
                     this.playerOpponent.x = latest.x + vx * extrapolationTime;
                     this.playerOpponent.z = latest.z + vz * extrapolationTime;
@@ -2234,6 +2270,20 @@ class MundoKnifeGame3D {
         if (!this.isMultiplayer || !socket) return;
         
         console.log('[MP-EVENTS] Setting up multiplayer event listeners');
+        
+        if (typeof TimeSync !== 'undefined' && typeof InputBuffer !== 'undefined' && typeof Reconciler !== 'undefined') {
+            this.timeSync = new TimeSync(socket);
+            this.inputBuffer = new InputBuffer();
+            this.reconciler = new Reconciler(this);
+            
+            if (this.NETCODE.prediction || this.NETCODE.reconciliation) {
+                this.timeSync.start();
+                console.log('[NETCODE] Advanced networking enabled - Prediction:', this.NETCODE.prediction, 'Reconciliation:', this.NETCODE.reconciliation);
+            }
+        } else {
+            console.log('[NETCODE] Advanced networking modules not available, using legacy mode');
+        }
+        
         socket.off('opponentMove');
         socket.off('serverKnifeSpawn');
         socket.off('serverKnifeHit');
@@ -2363,19 +2413,32 @@ class MundoKnifeGame3D {
                     }
                     
                     if (team === this.myTeam) {
-                        const dx = this.playerSelf.x - serverPlayer.x;
-                        const dz = this.playerSelf.z - serverPlayer.z;
-                        const positionErrorSq = dx * dx + dz * dz;
-                        
-                        if (positionErrorSq > 25) {
-                            this.playerSelf.x = serverPlayer.x;
-                            this.playerSelf.z = serverPlayer.z;
-                        }
-                        
-                        const timeSinceLastInput = Date.now() - this.lastMoveInputTime;
-                        if (serverPlayer.targetX != null && serverPlayer.targetZ != null && timeSinceLastInput > 100) {
-                            this.playerSelf.targetX = serverPlayer.targetX;
-                            this.playerSelf.targetZ = serverPlayer.targetZ;
+                        if (this.NETCODE.reconciliation && this.reconciler && this.inputBuffer && serverPlayer.lastProcessedSeq !== undefined) {
+                            this.inputBuffer.acknowledge(serverPlayer.lastProcessedSeq);
+                            
+                            const unackedInputs = this.inputBuffer.getUnacknowledgedInputs();
+                            
+                            this.reconciler.reconcile({
+                                x: serverPlayer.x,
+                                z: serverPlayer.z,
+                                health: serverPlayer.health,
+                                isDead: serverPlayer.isDead
+                            }, unackedInputs);
+                        } else {
+                            const dx = this.playerSelf.x - serverPlayer.x;
+                            const dz = this.playerSelf.z - serverPlayer.z;
+                            const positionErrorSq = dx * dx + dz * dz;
+                            
+                            if (positionErrorSq > 25) {
+                                this.playerSelf.x = serverPlayer.x;
+                                this.playerSelf.z = serverPlayer.z;
+                            }
+                            
+                            const timeSinceLastInput = Date.now() - this.lastMoveInputTime;
+                            if (serverPlayer.targetX != null && serverPlayer.targetZ != null && timeSinceLastInput > 100) {
+                                this.playerSelf.targetX = serverPlayer.targetX;
+                                this.playerSelf.targetZ = serverPlayer.targetZ;
+                            }
                         }
                     } else if (team === this.opponentTeam) {
                         const now = Date.now();
@@ -2471,7 +2534,6 @@ class MundoKnifeGame3D {
             this.hideLoadingOverlay();
             this.startCountdown();
         });
-
     }
     
     gameLoop() {
@@ -2494,6 +2556,10 @@ class MundoKnifeGame3D {
                 }
             }
             this.accumulator -= this.fixedDt;
+        }
+        
+        if (this.reconciler) {
+            this.reconciler.updateSmoothing();
         }
         
         [...this.team1, ...this.team2].forEach(player => {
@@ -3790,6 +3856,7 @@ function startGame(isMultiplayer = false) {
     const myTeamNumber = isHost ? 1 : 2;
     console.log('[GAME] Creating game with myTeam:', myTeamNumber, 'isHost:', isHost);
     currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost, practiceMode, myTeamNumber);
+    window.currentGame = currentGame; // Expose for testing
 }
 
 window.addEventListener('load', async () => {
