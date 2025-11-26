@@ -266,6 +266,7 @@ class MundoKnifeGame3D {
             this.camera = preloadedAssets.camera;
             
             const canvas = document.getElementById('gameCanvas');
+            this.container = canvas;
             if (canvas && !canvas.firstChild) {
                 canvas.appendChild(this.renderer.domElement);
             }
@@ -535,6 +536,10 @@ class MundoKnifeGame3D {
 
     setupThreeJS() {
         this.container = document.getElementById('gameCanvas');
+        if (!this.container) {
+            console.error('[ERROR] gameCanvas element not found in DOM');
+            return;
+        }
         
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x000000);
@@ -2057,6 +2062,10 @@ class MundoKnifeGame3D {
     }
 
     updateCooldownDisplay() {
+        if (!this.playerSelf) {
+            return;
+        }
+        
         const now = Date.now();
         const timeSinceLastKnife = now - this.playerSelf.lastKnifeTime;
         const cooldownProgress = Math.min(timeSinceLastKnife / this.playerSelf.knifeCooldown, 1);
@@ -2065,6 +2074,10 @@ class MundoKnifeGame3D {
         const cooldownCircle = document.getElementById('cooldownCircle');
         const cooldownTime = document.getElementById('cooldownTime');
         const cooldownBg = document.querySelector('.cooldown-circle-bg');
+        
+        if (!cooldownCircle || !cooldownTime || !cooldownBg) {
+            return;
+        }
         
         const radius = 56;
         const circumference = 2 * Math.PI * radius;
@@ -2077,14 +2090,23 @@ class MundoKnifeGame3D {
             cooldownTime.textContent = remainingTime.toFixed(1) + 's';
             cooldownBg.style.stroke = '#ff0000';
             cooldownCircle.style.opacity = '1';
+            cooldownCircle.style.stroke = '#ff0000';
         } else {
             cooldownTime.textContent = 'READY';
             cooldownBg.style.stroke = '#00ff00';
-            cooldownCircle.style.opacity = '0';
+            cooldownCircle.style.opacity = '0.5';
+            cooldownCircle.style.stroke = '#00ff00';
         }
     }
 
     onWindowResize() {
+        if (!this.container) {
+            this.container = document.getElementById('gameCanvas');
+        }
+        if (!this.container) {
+            console.warn('[RESIZE] gameCanvas not found, skipping resize');
+            return;
+        }
         const rect = this.container.getBoundingClientRect();
         this.camera.aspect = rect.width / rect.height;
         this.camera.updateProjectionMatrix();
