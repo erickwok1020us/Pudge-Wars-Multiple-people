@@ -3875,10 +3875,20 @@ function startGame(isMultiplayer = false) {
         mainMenuVideo.style.display = 'none';
     }
     
+    const hudElements = [
+        document.querySelector('.latency-display'),
+        document.querySelector('.fps-display'),
+        document.querySelector('.cooldown-display'),
+        document.querySelector('.instructions')
+    ];
+    hudElements.forEach(el => {
+        if (el) el.style.display = 'block';
+    });
+    
     const myTeamNumber = isHost ? 1 : 2;
     console.log('[GAME] Creating game with myTeam:', myTeamNumber, 'isHost:', isHost);
     currentGame = new MundoKnifeGame3D(gameMode, isMultiplayer, isHost, practiceMode, myTeamNumber);
-    window.currentGame = currentGame; // Expose for testing
+    window.currentGame = currentGame;// Expose for testing
 }
 
 window.addEventListener('load', async () => {
