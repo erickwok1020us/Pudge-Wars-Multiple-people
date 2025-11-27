@@ -545,15 +545,20 @@ class MundoKnifeGame3D {
         this.scene.background = new THREE.Color(0x000000);
         
         const rect = this.container.getBoundingClientRect();
+        const width = rect.width || window.innerWidth;
+        const height = rect.height || window.innerHeight;
+        
+        console.log('[SETUP-THREE] Container size:', width, 'x', height);
+        
         this.camera = new THREE.PerspectiveCamera(
             75, 
-            rect.width / rect.height, 
+            width / height, 
             0.1, 
             10000
         );
         
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
-        this.renderer.setSize(rect.width, rect.height, false);
+        this.renderer.setSize(width, height, false);
         this.renderer.shadowMap.enabled = this.shadowConfig.enabled;
         if (this.shadowConfig.enabled) {
             this.renderer.shadowMap.type = this.shadowConfig.type;
@@ -562,8 +567,12 @@ class MundoKnifeGame3D {
         this.canvas = this.renderer.domElement;
         this.container.appendChild(this.renderer.domElement);
         
+        this.onWindowResize();
+        
         this.setupLighting();
         this.setupTerrain();
+        
+        console.log('[SETUP-THREE] Scene children:', this.scene.children.length, 'Lights:', this.scene.children.filter(x => x.isLight).length);
     }
 
     setupLighting() {
@@ -1296,6 +1305,10 @@ class MundoKnifeGame3D {
         
         const now = Date.now();
         
+        if (this.gameState.countdownActive) {
+            return;
+        }
+        
         if (!this.playerSelf.canAttack) {
             return;
         }
@@ -2018,6 +2031,9 @@ class MundoKnifeGame3D {
             }
         }
         
+        const canvasWidth = this.cachedCanvasWidth || window.innerWidth;
+        const canvasHeight = this.cachedCanvasHeight || window.innerHeight;
+        
         [...this.team1, ...this.team2].forEach(player => {
             if (!player.healthBarElement || !player.mesh) return;
             
@@ -2045,9 +2061,8 @@ class MundoKnifeGame3D {
             );
             pos.project(this.camera);
             
-            const rect = this.renderer.domElement.getBoundingClientRect();
-            const x = (pos.x * 0.5 + 0.5) * rect.width;
-            const y = (-pos.y * 0.5 + 0.5) * rect.height;
+            const x = (pos.x * 0.5 + 0.5) * canvasWidth;
+            const y = (-pos.y * 0.5 + 0.5) * canvasHeight;
             
             healthBar.style.left = (x - 43) + 'px';
             healthBar.style.top = (y - 10) + 'px';
@@ -2073,9 +2088,8 @@ class MundoKnifeGame3D {
         
         const cooldownCircle = document.getElementById('cooldownCircle');
         const cooldownTime = document.getElementById('cooldownTime');
-        const cooldownBg = document.querySelector('.cooldown-circle-bg');
         
-        if (!cooldownCircle || !cooldownTime || !cooldownBg) {
+        if (!cooldownCircle || !cooldownTime) {
             return;
         }
         
@@ -2083,15 +2097,19 @@ class MundoKnifeGame3D {
         const circumference = 2 * Math.PI * radius;
         const offset = circumference * (1 - cooldownProgress);
         
-        cooldownCircle.style.strokeDasharray = `${circumference}`;
-        cooldownCircle.style.strokeDashoffset = `${offset}`;
+        if (!this._cooldownInitialized) {
+            cooldownCircle.style.strokeDasharray = `${circumference}`;
+            this._cooldownInitialized = true;
+        }
         
-        cooldownBg.style.stroke = '#ff0000';
+        if (!this.lastCooldownOffset || Math.abs(this.lastCooldownOffset - offset) > 1) {
+            cooldownCircle.style.strokeDashoffset = `${offset}`;
+            this.lastCooldownOffset = offset;
+        }
         
-        if (cooldownProgress < 1) {
-            cooldownTime.textContent = remainingTime.toFixed(1) + 's';
-        } else {
-            cooldownTime.textContent = 'READY';
+        const newText = cooldownProgress < 1 ? remainingTime.toFixed(1) + 's' : 'READY';
+        if (cooldownTime.textContent !== newText) {
+            cooldownTime.textContent = newText;
         }
     }
 
@@ -2104,9 +2122,19 @@ class MundoKnifeGame3D {
             return;
         }
         const rect = this.container.getBoundingClientRect();
-        this.camera.aspect = rect.width / rect.height;
+        const width = rect.width || window.innerWidth;
+        const height = rect.height || window.innerHeight;
+        
+        this.cachedCanvasWidth = width;
+        this.cachedCanvasHeight = height;
+        
+        this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
-        this.renderer.setSize(rect.width, rect.height, false);
+        
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setSize(width, height, false);
+        
+        console.log('[RESIZE] Canvas resized to:', width, 'x', height, 'aspect:', (width/height).toFixed(2));
     }
 
     startCountdown() {
@@ -2143,6 +2171,11 @@ class MundoKnifeGame3D {
         this.playerSelf.lastKnifeTime = Date.now();
         if (this.playerOpponent) {
             this.playerOpponent.lastKnifeTime = Date.now();
+        }
+        
+        this.playerSelf.canAttack = false;
+        if (this.playerOpponent && this.playerOpponent.isAI) {
+            this.playerOpponent.aiCanAttack = false;
         }
         
         let count = 5;
@@ -2838,6 +2871,15 @@ function restartGame() {
             currentGame.dispose();
             currentGame = null;
         }
+        
+        const gameCanvas = document.getElementById('gameCanvas');
+        if (gameCanvas) {
+            gameCanvas.style.display = 'block';
+            console.log('[RESTART] Canvas display:', getComputedStyle(gameCanvas).display);
+        }
+        
+        document.body.dataset.state = 'game';
+        
         window.__gameStarted = false;
         window.__mpStarting = false;
         startPractice(practiceMode);
