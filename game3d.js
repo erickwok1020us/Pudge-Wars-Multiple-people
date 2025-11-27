@@ -2083,19 +2083,15 @@ class MundoKnifeGame3D {
         const circumference = 2 * Math.PI * radius;
         const offset = circumference * (1 - cooldownProgress);
         
-        cooldownCircle.style.strokeDasharray = circumference;
-        cooldownCircle.style.strokeDashoffset = offset;
+        cooldownCircle.style.strokeDasharray = `${circumference}`;
+        cooldownCircle.style.strokeDashoffset = `${offset}`;
+        
+        cooldownBg.style.stroke = '#ff0000';
         
         if (cooldownProgress < 1) {
             cooldownTime.textContent = remainingTime.toFixed(1) + 's';
-            cooldownBg.style.stroke = '#ff0000';
-            cooldownCircle.style.opacity = '1';
-            cooldownCircle.style.stroke = '#ff0000';
         } else {
             cooldownTime.textContent = 'READY';
-            cooldownBg.style.stroke = '#00ff00';
-            cooldownCircle.style.opacity = '0.5';
-            cooldownCircle.style.stroke = '#00ff00';
         }
     }
 
