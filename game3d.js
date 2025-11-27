@@ -2121,20 +2121,26 @@ class MundoKnifeGame3D {
             console.warn('[RESIZE] gameCanvas not found, skipping resize');
             return;
         }
-        const rect = this.container.getBoundingClientRect();
-        const width = rect.width || window.innerWidth;
-        const height = rect.height || window.innerHeight;
         
-        this.cachedCanvasWidth = width;
-        this.cachedCanvasHeight = height;
-        
-        this.camera.aspect = width / height;
-        this.camera.updateProjectionMatrix();
-        
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.setSize(width, height, false);
-        
-        console.log('[RESIZE] Canvas resized to:', width, 'x', height, 'aspect:', (width/height).toFixed(2));
+        // Use requestAnimationFrame to ensure CSS has been recalculated after resize
+        requestAnimationFrame(() => {
+            const rect = this.container.getBoundingClientRect();
+            // Use window dimensions as fallback, but prefer container dimensions
+            const width = rect.width > 0 ? rect.width : window.innerWidth;
+            const height = rect.height > 0 ? rect.height : window.innerHeight;
+            
+            this.cachedCanvasWidth = width;
+            this.cachedCanvasHeight = height;
+            
+            this.camera.aspect = width / height;
+            this.camera.updateProjectionMatrix();
+            
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            // Use true to also update the canvas element's style dimensions
+            this.renderer.setSize(width, height, true);
+            
+            console.log('[RESIZE] Canvas resized to:', width, 'x', height, 'aspect:', (width/height).toFixed(2));
+        });
     }
 
     startCountdown() {
@@ -2168,9 +2174,13 @@ class MundoKnifeGame3D {
         if (this.playerOpponent) {
             this.playerOpponent.knifeCooldown = 4000;
         }
-        this.playerSelf.lastKnifeTime = Date.now();
+        // Set lastKnifeTime to 1 second in the future so the 4-second cooldown
+        // finishes exactly when the 5-second countdown ends (at FIGHT!)
+        // This makes the cooldown circle start spinning and be ready at FIGHT
+        const cooldownStartOffset = 1000; // 5 second countdown - 4 second cooldown = 1 second offset
+        this.playerSelf.lastKnifeTime = Date.now() + cooldownStartOffset;
         if (this.playerOpponent) {
-            this.playerOpponent.lastKnifeTime = Date.now();
+            this.playerOpponent.lastKnifeTime = Date.now() + cooldownStartOffset;
         }
         
         this.playerSelf.canAttack = false;
@@ -2860,6 +2870,16 @@ class MundoKnifeGame3D {
         if (this.gameLoopId) {
             cancelAnimationFrame(this.gameLoopId);
         }
+        
+        // Reset preloadedAssets so the next game instance will create fresh scene/renderer/camera
+        // Keep characterModel and animations as they can be reused
+        console.log('[DISPOSE] Resetting preloadedAssets for next game');
+        preloadedAssets.scene = null;
+        preloadedAssets.renderer = null;
+        preloadedAssets.camera = null;
+        preloadedAssets.terrain = null;
+        preloadedAssets.lights = [];
+        preloadedAssets.isLoaded = false;
     }
 }
 
