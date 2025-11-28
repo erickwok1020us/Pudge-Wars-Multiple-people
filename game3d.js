@@ -1759,6 +1759,12 @@ class MundoKnifeGame3D {
                     
                     this.playerOpponent.x = latest.x + vx * extrapolationTime;
                     this.playerOpponent.z = latest.z + vz * extrapolationTime;
+                    
+                    if (Math.abs(vx) > 0.0001 || Math.abs(vz) > 0.0001) {
+                        const angle = Math.atan2(vz, vx);
+                        this.playerOpponent.rotation = -angle + Math.PI / 2;
+                        this.playerOpponent.facing = vx > 0 ? 1 : -1;
+                    }
                 } else {
                     this.playerOpponent.x = latest.x;
                     this.playerOpponent.z = latest.z;
@@ -1775,6 +1781,7 @@ class MundoKnifeGame3D {
             if (this.playerOpponent.mesh) {
                 this.playerOpponent.mesh.position.x = this.playerOpponent.x;
                 this.playerOpponent.mesh.position.z = this.playerOpponent.z;
+                this.playerOpponent.mesh.rotation.y = this.playerOpponent.rotation;
                 
                 if (this.debugSync) {
                     console.log(`[SYNC-DEBUG] Applied extrapolated position to mesh - x:${this.playerOpponent.x.toFixed(2)}, z:${this.playerOpponent.z.toFixed(2)}`);
@@ -1790,6 +1797,14 @@ class MundoKnifeGame3D {
         const interpolatedX = snapshot0.x + (snapshot1.x - snapshot0.x) * clampedT;
         const interpolatedZ = snapshot0.z + (snapshot1.z - snapshot0.z) * clampedT;
         
+        const dirX = snapshot1.x - snapshot0.x;
+        const dirZ = snapshot1.z - snapshot0.z;
+        if (Math.abs(dirX) > 0.001 || Math.abs(dirZ) > 0.001) {
+            const angle = Math.atan2(dirZ, dirX);
+            this.playerOpponent.rotation = -angle + Math.PI / 2;
+            this.playerOpponent.facing = dirX > 0 ? 1 : -1;
+        }
+        
         if (this.debugSync) {
             console.log(`[SYNC-DEBUG] Interpolating - renderTime:${renderTime}, s0:${snapshot0.timestamp}, s1:${snapshot1.timestamp}, t:${clampedT.toFixed(3)}, x:${interpolatedX.toFixed(2)}, z:${interpolatedZ.toFixed(2)}`);
         }
@@ -1803,6 +1818,7 @@ class MundoKnifeGame3D {
         if (this.playerOpponent.mesh) {
             this.playerOpponent.mesh.position.x = interpolatedX;
             this.playerOpponent.mesh.position.z = interpolatedZ;
+            this.playerOpponent.mesh.rotation.y = this.playerOpponent.rotation;
             
             if (this.debugSync) {
                 console.log(`[SYNC-DEBUG] Applied interpolated position to mesh - x:${interpolatedX.toFixed(2)}, z:${interpolatedZ.toFixed(2)}`);
