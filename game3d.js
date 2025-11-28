@@ -1811,6 +1811,8 @@ class MundoKnifeGame3D {
         for (let i = this.knives.length - 1; i >= 0; i--) {
             const knife = this.knives[i];
             
+            if (knife.hasHit) continue;
+            
             knife.mesh.position.x += knife.vx;
             knife.mesh.position.y += (knife.vy || 0);
             knife.mesh.position.z += knife.vz;
@@ -2436,14 +2438,17 @@ class MundoKnifeGame3D {
             
             const knife = this.knives.find(k => k.knifeId === data.knifeId);
             if (knife) {
+                knife.hasHit = true;
                 if (knife.mesh) {
                     knife.mesh.position.set(hitX, hitY, hitZ);
                 }
-                this.disposeKnife(knife);
-                const index = this.knives.indexOf(knife);
-                if (index > -1) {
-                    this.knives.splice(index, 1);
-                }
+                setTimeout(() => {
+                    this.disposeKnife(knife);
+                    const index = this.knives.indexOf(knife);
+                    if (index > -1) {
+                        this.knives.splice(index, 1);
+                    }
+                }, 50);
             }
         });
         
@@ -2761,6 +2766,8 @@ class MundoKnifeGame3D {
         
         for (let i = 0; i < this.knives.length && i < this.previousState.knives.length; i++) {
             const knife = this.knives[i];
+            if (knife.hasHit) continue;
+            
             const prevKnife = this.previousState.knives[i];
             const currKnife = this.currentState.knives[i];
             
