@@ -2407,8 +2407,26 @@ class MundoKnifeGame3D {
         });
         
         socket.on('serverKnifeHit', (data) => {
+            let targetPlayer = null;
+            if (data.targetTeam === this.myTeam) {
+                targetPlayer = this.playerSelf;
+            } else if (data.targetTeam === this.opponentTeam) {
+                targetPlayer = this.playerOpponent;
+            }
             
-            this.createBloodEffect(data.hitX, 5, data.hitZ);
+            let hitX = data.hitX;
+            let hitY = 5;
+            let hitZ = data.hitZ;
+            
+            if (targetPlayer && targetPlayer.mesh) {
+                const targetWorldPos = new THREE.Vector3();
+                targetPlayer.mesh.getWorldPosition(targetWorldPos);
+                hitX = targetWorldPos.x;
+                hitY = targetWorldPos.y;
+                hitZ = targetWorldPos.z;
+            }
+            
+            this.createBloodEffect(hitX, hitY, hitZ);
             
             const hitSound = document.getElementById('hitSound');
             if (hitSound) {
@@ -2419,9 +2437,7 @@ class MundoKnifeGame3D {
             const knife = this.knives.find(k => k.knifeId === data.knifeId);
             if (knife) {
                 if (knife.mesh) {
-                    knife.mesh.position.x = data.hitX;
-                    knife.mesh.position.y = 5;
-                    knife.mesh.position.z = data.hitZ;
+                    knife.mesh.position.set(hitX, hitY, hitZ);
                 }
                 this.disposeKnife(knife);
                 const index = this.knives.indexOf(knife);
