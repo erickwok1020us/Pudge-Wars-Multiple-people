@@ -1332,10 +1332,11 @@ class MundoKnifeGame3D {
             
             if (this.isMultiplayer && socket) {
                 const predictedKnife = this.createKnife3DTowards(this.playerSelf, targetX, targetZ, this.raycaster.ray.direction, knifeAudio);
-                if (predictedKnife) {
-                    predictedKnife.actionId = actionId;
-                    predictedKnife.isPredicted = true;
-                }
+                    if (predictedKnife) {
+                        predictedKnife.actionId = actionId;
+                        predictedKnife.isPredicted = true;
+                        console.log('[KNIFE][PREDICTED]', { actionId, idx: this.knives.indexOf(predictedKnife), myTeam: this.myTeam, typeMyTeam: typeof this.myTeam });
+                    }
                 
                 // Include clientTimestamp for lag compensation
                 const clientTimestamp = this.timeSync ? this.timeSync.getServerTime() : Date.now();
@@ -2384,19 +2385,23 @@ class MundoKnifeGame3D {
         });
         
         socket.on('serverKnifeSpawn', (data) => {
+            console.log('[KNIFE][SPAWN-RECV]', { ownerTeam: data.ownerTeam, typeOwnerTeam: typeof data.ownerTeam, actionId: data.actionId, knifeId: data.knifeId, myTeam: this.myTeam, typeMyTeam: typeof this.myTeam, opponentTeam: this.opponentTeam });
             
             if (data.ownerTeam === this.myTeam && data.actionId) {
                 const predictedKnife = this.knives.find(k => k.actionId === data.actionId && k.isPredicted);
                 if (predictedKnife) {
-                    console.log(`[SERVER-RECONCILE] Found predicted knife, replacing with server knife ${data.knifeId}`);
+                    console.log('[KNIFE][SPAWN-LOCAL-MATCH]', { actionId: data.actionId, knifeId: data.knifeId });
                     predictedKnife.knifeId = data.knifeId;
                     predictedKnife.isPredicted = false;
                     predictedKnife.serverConfirmed = true;
                     return;
+                } else {
+                    console.warn('[KNIFE][SPAWN-LOCAL-MISS]', { actionId: data.actionId, knives: this.knives.map(k => ({ actionId: k.actionId, isPredicted: k.isPredicted, knifeId: k.knifeId })) });
                 }
             }
             
             if (data.ownerTeam !== this.myTeam) {
+                console.log('[KNIFE][SPAWN-REMOTE]', data);
                 const thrower = data.ownerTeam === this.opponentTeam ? this.playerOpponent : null;
                 if (thrower) {
                     const targetX = data.x + data.velocityX * 10;
@@ -2405,12 +2410,15 @@ class MundoKnifeGame3D {
                     if (knife) {
                         knife.knifeId = data.knifeId;
                         knife.serverConfirmed = true;
+                        console.log('[KNIFE][SPAWN-REMOTE-CREATED]', { knifeId: data.knifeId, idx: this.knives.indexOf(knife) });
                     }
                 }
             }
         });
         
         socket.on('serverKnifeHit', (data) => {
+            console.log('[KNIFE][HIT-RECV]', { knifeId: data.knifeId, targetTeam: data.targetTeam, hitX: data.hitX, hitZ: data.hitZ });
+            
             let targetPlayer = null;
             if (data.targetTeam === this.myTeam) {
                 targetPlayer = this.playerSelf;
@@ -2440,6 +2448,7 @@ class MundoKnifeGame3D {
             
             const knife = this.knives.find(k => k.knifeId === data.knifeId);
             if (knife) {
+                console.log('[KNIFE][HIT-FIND-SUCCESS]', { knifeId: data.knifeId, idx: this.knives.indexOf(knife), hasHit: knife.hasHit });
                 knife.hasHit = true;
                 if (knife.mesh) {
                     knife.mesh.position.set(hitX, hitY, hitZ);
@@ -2451,6 +2460,8 @@ class MundoKnifeGame3D {
                         this.knives.splice(index, 1);
                     }
                 }, 50);
+            } else {
+                console.warn('[KNIFE][HIT-FIND-FAIL]', { knifeId: data.knifeId, knives: this.knives.map(k => ({ knifeId: k.knifeId, actionId: k.actionId, hasHit: k.hasHit })) });
             }
         });
         
