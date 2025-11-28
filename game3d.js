@@ -1339,12 +1339,24 @@ class MundoKnifeGame3D {
                 
                 // Include clientTimestamp for lag compensation
                 const clientTimestamp = this.timeSync ? this.timeSync.getServerTime() : Date.now();
+                
+                // LAG DEBUG: Generate unique debugId and log client send time
+                const debugId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                const clientSendTime = Date.now();
+                console.log(`[LAG][KNIFE][CLIENT-SEND] id=${debugId} t=${clientSendTime} actionId=${actionId}`);
+                
+                // Store debugId for tracking health update response
+                if (!this.pendingKnifeDebug) this.pendingKnifeDebug = new Map();
+                this.pendingKnifeDebug.set(actionId, { debugId, clientSendTime });
+                
                 socket.emit('knifeThrow', {
                     roomCode: roomCode,
                     targetX: targetX,
                     targetZ: targetZ,
                     actionId: actionId,
-                    clientTimestamp: clientTimestamp
+                    clientTimestamp: clientTimestamp,
+                    debugId: debugId,
+                    clientSendTime: clientSendTime
                 });
             } else {
                 this.createKnife3DTowards(this.playerSelf, targetX, targetZ, this.raycaster.ray.direction, knifeAudio);
@@ -1702,6 +1714,9 @@ class MundoKnifeGame3D {
         
         this.interpolationDelay = adaptiveDelay;
         this.networkStats.lastAdaptiveUpdate = now;
+        
+        // LAG DEBUG: Log interpolation delay and related stats
+        console.log(`[LAG][INTERP] delay=${this.interpolationDelay.toFixed(1)}ms jitter=${jitter.toFixed(1)}ms avgInterval=${avgInterval.toFixed(1)}ms serverTimeOffset=${this.serverTimeOffset}ms`);
     }
 
     interpolateOpponentPosition() {
@@ -2560,6 +2575,26 @@ class MundoKnifeGame3D {
         });
         
         socket.on('serverHealthUpdate', (data) => {
+            // LAG DEBUG: Log when health update is received
+            const clientReceiveTime = Date.now();
+            const debugId = data.debugId || 'unknown';
+            const serverEmitTime = data.serverEmitTime || 0;
+            const clientSendTime = data.clientSendTime || 0;
+            
+            // Calculate end-to-end delay if we have the original send time
+            let e2eDelay = 'N/A';
+            if (clientSendTime > 0) {
+                e2eDelay = `${clientReceiveTime - clientSendTime}ms`;
+            }
+            
+            // Calculate server-to-client leg if we have server emit time
+            let s2cDelay = 'N/A';
+            if (serverEmitTime > 0) {
+                // Note: This is approximate due to clock skew
+                s2cDelay = `~${clientReceiveTime - serverEmitTime}ms (clock skew not corrected)`;
+            }
+            
+            console.log(`[LAG][KNIFE][CLIENT-RECV-HEALTH] id=${debugId} t=${clientReceiveTime} e2e=${e2eDelay} serverEmit=${serverEmitTime} s2c=${s2cDelay}`);
             console.log(`[SERVER-HEALTH] Received authoritative health update - targetTeam:${data.targetTeam} health:${data.health} serverTick:${data.serverTick}`);
             this.applyServerHealthUpdate(data);
         });
