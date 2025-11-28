@@ -1952,6 +1952,14 @@ class MundoKnifeGame3D {
                     // In multiplayer: hide knife visually but DON'T remove from array
                     // Server will send serverKnifeHit/serverKnifeDestroy to do actual cleanup
                     knife.mesh.visible = false;
+                    knife.predictedHit = true;
+                    
+                    // Optimistic health update for opponent - gives immediate heart feedback
+                    // Server will send authoritative health later to reconcile
+                    if (target === this.playerOpponent && target.health > 0) {
+                        target.health = Math.max(0, target.health - 1);
+                        this.updateHealthDisplay();
+                    }
                 } else {
                     // In AI mode: dispose knife immediately
                     this.disposeKnife(knife);
@@ -2478,17 +2486,26 @@ class MundoKnifeGame3D {
                 hitZ = targetWorldPos.z;
             }
             
-            this.createBloodEffect(hitX, hitY, hitZ);
+            const knife = this.knives.find(k => k.knifeId === data.knifeId);
             
-            const hitSound = document.getElementById('hitSound');
-            if (hitSound) {
-                hitSound.currentTime = 0;
-                hitSound.play().catch(e => {});
+            // Check if this hit was already predicted by the local player
+            // If so, skip duplicate blood/sound effects
+            const isLocalOwner = knife && knife.thrower && knife.thrower === this.playerSelf;
+            const alreadyPredicted = knife && knife.predictedHit;
+            
+            if (!(isLocalOwner && alreadyPredicted)) {
+                // Only play blood/sound if this client did NOT already predict this hit
+                this.createBloodEffect(hitX, hitY, hitZ);
+                
+                const hitSound = document.getElementById('hitSound');
+                if (hitSound) {
+                    hitSound.currentTime = 0;
+                    hitSound.play().catch(e => {});
+                }
             }
             
-            const knife = this.knives.find(k => k.knifeId === data.knifeId);
             if (knife) {
-                console.log('[KNIFE][HIT-FIND-SUCCESS]', { knifeId: data.knifeId, idx: this.knives.indexOf(knife), hasHit: knife.hasHit });
+                console.log('[KNIFE][HIT-FIND-SUCCESS]', { knifeId: data.knifeId, idx: this.knives.indexOf(knife), hasHit: knife.hasHit, predictedHit: knife.predictedHit });
                 knife.hasHit = true;
                 if (knife.mesh) {
                     knife.mesh.position.set(hitX, hitY, hitZ);
