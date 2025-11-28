@@ -1816,16 +1816,16 @@ class MundoKnifeGame3D {
             
             if (knife.hasHit) continue;
             
+            // In multiplayer, server-confirmed knives are controlled entirely by server events
+            // Don't update position locally - wait for serverKnifeHit or serverKnifeDestroy
+            if (this.isMultiplayer && knife.serverConfirmed) {
+                continue;
+            }
+            
             knife.mesh.position.x += knife.vx;
             knife.mesh.position.y += (knife.vy || 0);
             knife.mesh.position.z += knife.vz;
             knife.mesh.rotation.z += 0.3;
-            
-            // In multiplayer, let server-confirmed knives be controlled by server events
-            // Don't dispose them locally - wait for serverKnifeHit or serverKnifeDestroy
-            if (this.isMultiplayer && knife.serverConfirmed) {
-                continue;
-            }
             
             if (Math.abs(knife.mesh.position.x) > 120 ||
                 Math.abs(knife.mesh.position.z) > 90 ||
