@@ -1822,9 +1822,18 @@ class MundoKnifeGame3D {
             knife.mesh.position.z += knife.vz;
             knife.mesh.rotation.z += 0.3;
             
+            // Check if this is the local player's knife (for client-side hit prediction)
+            const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerLocal;
+            
             // In multiplayer, server-confirmed knives should NOT be disposed locally
-            // Wait for serverKnifeHit or serverKnifeDestroy events from server
-            if (this.isMultiplayer && knife.serverConfirmed) {
+            // But local player's knives should still run collision detection for visual prediction
+            if (this.isMultiplayer && knife.serverConfirmed && !isLocalPlayerKnife) {
+                continue;
+            }
+            
+            // Local player's knives: run collision detection for visual prediction
+            if (isLocalPlayerKnife) {
+                this.checkKnifeCollisions(knife, i);
                 continue;
             }
             
@@ -1937,11 +1946,15 @@ class MundoKnifeGame3D {
                 // Mark knife as hit so it stops updating
                 knife.hasHit = true;
                 
-                this.disposeKnife(knife);
-                this.knives.splice(knifeIndex, 1);
-                
-                // Only update health locally in AI mode (server handles health in multiplayer)
-                if (!this.isMultiplayer) {
+                if (this.isMultiplayer) {
+                    // In multiplayer: hide knife visually but DON'T remove from array
+                    // Server will send serverKnifeHit/serverKnifeDestroy to do actual cleanup
+                    knife.mesh.visible = false;
+                } else {
+                    // In AI mode: dispose knife immediately
+                    this.disposeKnife(knife);
+                    this.knives.splice(knifeIndex, 1);
+                    
                     target.health--;
                     console.log(`💔 [HEALTH] Team${target.team} Player${target.playerIndex} health after hit: ${target.health}/${target.maxHealth}`);
                     
