@@ -2418,6 +2418,11 @@ class MundoKnifeGame3D {
             
             const knife = this.knives.find(k => k.knifeId === data.knifeId);
             if (knife) {
+                if (knife.mesh) {
+                    knife.mesh.position.x = data.hitX;
+                    knife.mesh.position.y = 5;
+                    knife.mesh.position.z = data.hitZ;
+                }
                 this.disposeKnife(knife);
                 const index = this.knives.indexOf(knife);
                 if (index > -1) {
