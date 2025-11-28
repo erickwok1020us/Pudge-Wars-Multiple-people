@@ -1884,7 +1884,11 @@ class MundoKnifeGame3D {
     }
 
     checkKnifeCollisions(knife, knifeIndex) {
-        if (this.isMultiplayer) {
+        // In multiplayer, only do client-side prediction for local player's own knives
+        // This gives immediate visual feedback like AI mode
+        const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerLocal;
+        
+        if (this.isMultiplayer && !isLocalPlayerKnife) {
             return;
         }
         
@@ -1892,9 +1896,17 @@ class MundoKnifeGame3D {
         knife.mesh.getWorldPosition(knifeWorldPos);
         
         const thrower = knife.thrower;
-        const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
         
-        targetTeam.forEach(target => {
+        // In multiplayer, target is the opponent; in AI mode, use team-based targeting
+        let targets = [];
+        if (this.isMultiplayer && this.playerOpponent) {
+            targets = [this.playerOpponent];
+        } else {
+            const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
+            targets = targetTeam;
+        }
+        
+        targets.forEach(target => {
             if (target.health <= 0) return;
             
             const targetWorldPos = new THREE.Vector3();
@@ -1912,7 +1924,7 @@ class MundoKnifeGame3D {
             const threshold = this.characterSize * 1.05;
             
             if (distance < threshold) {
-                console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit Team${target.team} Player${target.playerIndex}!`);
+                console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit target! (multiplayer: ${this.isMultiplayer})`);
                 
                 this.createBloodEffect(targetWorldPos.x, targetWorldPos.y, targetWorldPos.z);
                 
@@ -1922,17 +1934,23 @@ class MundoKnifeGame3D {
                     hitSound.play().catch(e => {});
                 }
                 
+                // Mark knife as hit so it stops updating
+                knife.hasHit = true;
+                
                 this.disposeKnife(knife);
                 this.knives.splice(knifeIndex, 1);
                 
-                target.health--;
-                console.log(`💔 [HEALTH] Team${target.team} Player${target.playerIndex} health after hit: ${target.health}/${target.maxHealth}`);
-                
-                this.updateHealthDisplay();
-                
-                if (target.health <= 0) {
-                    console.log(`☠️ [DEATH] Team${target.team} Player${target.playerIndex} has died`);
-                    this.handlePlayerDeath(target);
+                // Only update health locally in AI mode (server handles health in multiplayer)
+                if (!this.isMultiplayer) {
+                    target.health--;
+                    console.log(`💔 [HEALTH] Team${target.team} Player${target.playerIndex} health after hit: ${target.health}/${target.maxHealth}`);
+                    
+                    this.updateHealthDisplay();
+                    
+                    if (target.health <= 0) {
+                        console.log(`☠️ [DEATH] Team${target.team} Player${target.playerIndex} has died`);
+                        this.handlePlayerDeath(target);
+                    }
                 }
             }
         });
