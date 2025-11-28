@@ -1535,6 +1535,8 @@ class MundoKnifeGame3D {
         
         this.knives.push(knifeData);
         this.scene.add(knifeGroup);
+        
+        return knifeData;
     }
 
     createKnife3D(fromPlayer, toPlayer) {
