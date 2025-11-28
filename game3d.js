@@ -1823,7 +1823,8 @@ class MundoKnifeGame3D {
             knife.mesh.rotation.z += 0.3;
             
             // Check if this is the local player's knife (for client-side hit prediction)
-            const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerLocal;
+            // Use this.playerSelf which is the correct reference to the local player
+            const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerSelf;
             
             // In multiplayer, server-confirmed knives should NOT be disposed locally
             // But local player's knives should still run collision detection for visual prediction
@@ -1895,7 +1896,8 @@ class MundoKnifeGame3D {
     checkKnifeCollisions(knife, knifeIndex) {
         // In multiplayer, only do client-side prediction for local player's own knives
         // This gives immediate visual feedback like AI mode
-        const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerLocal;
+        // Use this.playerSelf which is the correct reference to the local player
+        const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerSelf;
         
         if (this.isMultiplayer && !isLocalPlayerKnife) {
             return;
