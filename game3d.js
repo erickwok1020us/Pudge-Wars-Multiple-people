@@ -1832,25 +1832,20 @@ class MundoKnifeGame3D {
             
             if (knife.hasHit) continue;
             
-            // Always update knife position and rotation (keep it moving smoothly)
             knife.mesh.position.x += knife.vx;
             knife.mesh.position.y += (knife.vy || 0);
             knife.mesh.position.z += knife.vz;
             knife.mesh.rotation.z += 0.3;
             
-            // Check if this is the local player's knife (for client-side hit prediction)
-            // Use this.playerSelf which is the correct reference to the local player
             const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerSelf;
+            const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerOpponent;
             
-            // In multiplayer, server-confirmed knives should NOT be disposed locally
-            // But local player's knives should still run collision detection for visual prediction
-            if (this.isMultiplayer && knife.serverConfirmed && !isLocalPlayerKnife) {
-                continue;
+            if (isLocalPlayerKnife || isOpponentKnife) {
+                this.checkKnifeCollisions(knife, i);
+                if (knife.hasHit) continue;
             }
             
-            // Local player's knives: run collision detection for visual prediction
-            if (isLocalPlayerKnife) {
-                this.checkKnifeCollisions(knife, i);
+            if (this.isMultiplayer && knife.serverConfirmed) {
                 continue;
             }
             
@@ -1910,12 +1905,10 @@ class MundoKnifeGame3D {
     }
 
     checkKnifeCollisions(knife, knifeIndex) {
-        // In multiplayer, only do client-side prediction for local player's own knives
-        // This gives immediate visual feedback like AI mode
-        // Use this.playerSelf which is the correct reference to the local player
         const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerSelf;
+        const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerOpponent;
         
-        if (this.isMultiplayer && !isLocalPlayerKnife) {
+        if (this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife) {
             return;
         }
         
@@ -1924,10 +1917,13 @@ class MundoKnifeGame3D {
         
         const thrower = knife.thrower;
         
-        // In multiplayer, target is the opponent; in AI mode, use team-based targeting
         let targets = [];
-        if (this.isMultiplayer && this.playerOpponent) {
-            targets = [this.playerOpponent];
+        if (this.isMultiplayer) {
+            if (isLocalPlayerKnife) {
+                targets = [this.playerOpponent];
+            } else if (isOpponentKnife) {
+                targets = [this.playerSelf];
+            }
         } else {
             const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
             targets = targetTeam;
@@ -1951,7 +1947,7 @@ class MundoKnifeGame3D {
             const threshold = this.characterSize * 1.05;
             
             if (distance < threshold) {
-                console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit target! (multiplayer: ${this.isMultiplayer})`);
+                console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit ${isOpponentKnife ? 'self' : 'opponent'}! (multiplayer: ${this.isMultiplayer})`);
                 
                 this.createBloodEffect(targetWorldPos.x, targetWorldPos.y, targetWorldPos.z);
                 
@@ -1961,23 +1957,17 @@ class MundoKnifeGame3D {
                     hitSound.play().catch(e => {});
                 }
                 
-                // Mark knife as hit so it stops updating
                 knife.hasHit = true;
                 
                 if (this.isMultiplayer) {
-                    // In multiplayer: hide knife visually but DON'T remove from array
-                    // Server will send serverKnifeHit/serverKnifeDestroy to do actual cleanup
                     knife.mesh.visible = false;
                     knife.predictedHit = true;
                     
-                    // Optimistic health update for opponent - gives immediate heart feedback
-                    // Server will send authoritative health later to reconcile
-                    if (target === this.playerOpponent && target.health > 0) {
+                    if (isLocalPlayerKnife && target === this.playerOpponent && target.health > 0) {
                         target.health = Math.max(0, target.health - 1);
                         this.updateHealthDisplay();
                     }
                 } else {
-                    // In AI mode: dispose knife immediately
                     this.disposeKnife(knife);
                     this.knives.splice(knifeIndex, 1);
                     
@@ -2470,7 +2460,12 @@ class MundoKnifeGame3D {
                 if (thrower) {
                     const targetX = data.x + data.velocityX * 10;
                     const targetZ = data.z + data.velocityZ * 10;
-                    const knife = this.createKnife3DTowards(thrower, targetX, targetZ, null);
+                    
+                    const knifeAudio = new Audio('knife-slice-41231.mp3');
+                    knifeAudio.volume = 0.4;
+                    knifeAudio.play().catch(e => {});
+                    
+                    const knife = this.createKnife3DTowards(thrower, targetX, targetZ, null, knifeAudio);
                     if (knife) {
                         knife.knifeId = data.knifeId;
                         knife.serverConfirmed = true;
