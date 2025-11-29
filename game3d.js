@@ -1093,9 +1093,20 @@ class MundoKnifeGame3D {
     updatePlayerAnimation(player, dt) {
         let desiredState = 'idle';
         
+        const prevX = player._prevAnimX ?? player.x;
+        const prevZ = player._prevAnimZ ?? player.z;
+        const dx = player.x - prevX;
+        const dz = player.z - prevZ;
+        const distSq = dx * dx + dz * dz;
+        const movingEpsilonSq = 0.01;
+        const isActuallyMoving = distSq > movingEpsilonSq;
+        
+        player._prevAnimX = player.x;
+        player._prevAnimZ = player.z;
+        
         if (player.health <= 0) {
             desiredState = 'death';
-        } else if (player.isMoving) {
+        } else if (isActuallyMoving) {
             desiredState = 'run';
         }
         
@@ -2134,6 +2145,8 @@ class MundoKnifeGame3D {
         
         const canvasWidth = this.cachedCanvasWidth || window.innerWidth;
         const canvasHeight = this.cachedCanvasHeight || window.innerHeight;
+        const offsetX = this.canvasOffsetX || 0;
+        const offsetY = this.canvasOffsetY || 0;
         
         [...this.team1, ...this.team2].forEach(player => {
             if (!player.healthBarElement || !player.mesh) return;
@@ -2162,8 +2175,8 @@ class MundoKnifeGame3D {
             );
             pos.project(this.camera);
             
-            const x = (pos.x * 0.5 + 0.5) * canvasWidth;
-            const y = (-pos.y * 0.5 + 0.5) * canvasHeight;
+            const x = (pos.x * 0.5 + 0.5) * canvasWidth + offsetX;
+            const y = (-pos.y * 0.5 + 0.5) * canvasHeight + offsetY;
             
             healthBar.style.left = (x - 43) + 'px';
             healthBar.style.top = (y - 10) + 'px';
@@ -2240,6 +2253,8 @@ class MundoKnifeGame3D {
             
             this.cachedCanvasWidth = width;
             this.cachedCanvasHeight = height;
+            this.canvasOffsetX = (windowWidth - width) / 2;
+            this.canvasOffsetY = (windowHeight - height) / 2;
             
             this.camera.aspect = targetAspect;
             this.camera.updateProjectionMatrix();
@@ -2249,11 +2264,11 @@ class MundoKnifeGame3D {
             
             if (this.renderer.domElement) {
                 this.renderer.domElement.style.position = 'absolute';
-                this.renderer.domElement.style.left = ((windowWidth - width) / 2) + 'px';
-                this.renderer.domElement.style.top = ((windowHeight - height) / 2) + 'px';
+                this.renderer.domElement.style.left = this.canvasOffsetX + 'px';
+                this.renderer.domElement.style.top = this.canvasOffsetY + 'px';
             }
             
-            console.log('[RESIZE] Canvas resized to:', width.toFixed(0), 'x', height.toFixed(0), 'aspect:', targetAspect.toFixed(2), 'centered');
+            console.log('[RESIZE] Canvas resized to:', width.toFixed(0), 'x', height.toFixed(0), 'offset:', this.canvasOffsetX.toFixed(0), ',', this.canvasOffsetY.toFixed(0));
         });
     }
 
