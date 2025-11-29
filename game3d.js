@@ -2564,10 +2564,13 @@ class MundoKnifeGame3D {
         socket.on('serverMoveAck', (data) => {
             if (!data.actionId) return;
             
-            // Server has acknowledged movement, reconcile if needed
+            if (this.NETCODE.reconciliation && this.reconciler) {
+                return;
+            }
+            
             const serverX = data.x;
             const serverZ = data.z;
-            const errorThreshold = 5.0; // Allow 5 units of error before reconciling
+            const errorThreshold = 5.0;
             
             const errorDist = Math.sqrt(
                 Math.pow(this.playerSelf.x - serverX, 2) + 
