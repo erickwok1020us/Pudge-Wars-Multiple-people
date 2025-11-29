@@ -1840,6 +1840,18 @@ class MundoKnifeGame3D {
             const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.myTeam;
             const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.opponentTeam;
             
+            if (isOpponentKnife) {
+                console.log('[KNIFE][CLASSIFY]', {
+                    role: this.isHostPlayer ? 'HOST' : 'JOINER',
+                    myTeam: this.myTeam,
+                    opponentTeam: this.opponentTeam,
+                    throwerTeam: knife.thrower.team,
+                    isLocalPlayerKnife,
+                    isOpponentKnife,
+                    knifeId: knife.knifeId
+                });
+            }
+            
             if (isLocalPlayerKnife || isOpponentKnife) {
                 this.checkKnifeCollisions(knife, i);
                 if (knife.hasHit) continue;
@@ -1945,6 +1957,21 @@ class MundoKnifeGame3D {
             );
             
             const threshold = this.characterSize * 1.05;
+            
+            if (isOpponentKnife && target === this.playerSelf) {
+                console.log('[KNIFE][PREDICT-DEBUG]', {
+                    role: this.isHostPlayer ? 'HOST' : 'JOINER',
+                    myTeam: this.myTeam,
+                    opponentTeam: this.opponentTeam,
+                    throwerTeam: thrower.team,
+                    targetTeam: target.team,
+                    distance: distance.toFixed(2),
+                    threshold: threshold.toFixed(2),
+                    willHit: distance < threshold,
+                    knifePos: { x: knifeWorldPos.x.toFixed(2), z: knifeWorldPos.z.toFixed(2) },
+                    targetPos: { x: targetWorldPos.x.toFixed(2), z: targetWorldPos.z.toFixed(2) }
+                });
+            }
             
             if (distance < threshold) {
                 console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit ${isOpponentKnife ? 'self' : 'opponent'}! (multiplayer: ${this.isMultiplayer})`);
