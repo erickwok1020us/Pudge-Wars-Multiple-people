@@ -1664,7 +1664,7 @@ class MundoKnifeGame3D {
             const dz = player.targetZ - player.z;
             const distance = Math.sqrt(dx * dx + dz * dz);
             
-            if (distance > 1) {
+            if (distance > 0.1) {
                 const newX = player.x + (dx / distance) * player.moveSpeed;
                 const newZ = player.z + (dz / distance) * player.moveSpeed;
                 
