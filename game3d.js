@@ -2223,24 +2223,37 @@ class MundoKnifeGame3D {
             return;
         }
         
-        // Use requestAnimationFrame to ensure CSS has been recalculated after resize
         requestAnimationFrame(() => {
-            const rect = this.container.getBoundingClientRect();
-            // Use window dimensions as fallback, but prefer container dimensions
-            const width = rect.width > 0 ? rect.width : window.innerWidth;
-            const height = rect.height > 0 ? rect.height : window.innerHeight;
+            const targetAspect = 16 / 9;
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const windowAspect = windowWidth / windowHeight;
+            
+            let width, height;
+            if (windowAspect > targetAspect) {
+                height = windowHeight;
+                width = height * targetAspect;
+            } else {
+                width = windowWidth;
+                height = width / targetAspect;
+            }
             
             this.cachedCanvasWidth = width;
             this.cachedCanvasHeight = height;
             
-            this.camera.aspect = width / height;
+            this.camera.aspect = targetAspect;
             this.camera.updateProjectionMatrix();
             
             this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            // Use true to also update the canvas element's style dimensions
             this.renderer.setSize(width, height, true);
             
-            console.log('[RESIZE] Canvas resized to:', width, 'x', height, 'aspect:', (width/height).toFixed(2));
+            if (this.renderer.domElement) {
+                this.renderer.domElement.style.position = 'absolute';
+                this.renderer.domElement.style.left = ((windowWidth - width) / 2) + 'px';
+                this.renderer.domElement.style.top = ((windowHeight - height) / 2) + 'px';
+            }
+            
+            console.log('[RESIZE] Canvas resized to:', width.toFixed(0), 'x', height.toFixed(0), 'aspect:', targetAspect.toFixed(2), 'centered');
         });
     }
 
@@ -2564,10 +2577,13 @@ class MundoKnifeGame3D {
         socket.on('serverMoveAck', (data) => {
             if (!data.actionId) return;
             
-            // Server has acknowledged movement, reconcile if needed
+            if (this.NETCODE.reconciliation && this.reconciler) {
+                return;
+            }
+            
             const serverX = data.x;
             const serverZ = data.z;
-            const errorThreshold = 5.0; // Allow 5 units of error before reconciling
+            const errorThreshold = 5.0;
             
             const errorDist = Math.sqrt(
                 Math.pow(this.playerSelf.x - serverX, 2) + 

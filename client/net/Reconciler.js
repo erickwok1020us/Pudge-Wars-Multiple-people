@@ -103,9 +103,8 @@ class Reconciler {
             const distance = Math.sqrt(dx * dx + dz * dz);
             
             if (distance > 0.1) {
-                const moveSpeed = this.game.PLAYER_SPEED || 23.4;
-                const dt = 1 / 60; // Assume 60 FPS
-                const maxMove = moveSpeed * dt;
+                const moveSpeed = this.game.moveSpeed || 0.39;
+                const maxMove = moveSpeed;
                 
                 if (distance <= maxMove) {
                     player.x = input.targetX;
