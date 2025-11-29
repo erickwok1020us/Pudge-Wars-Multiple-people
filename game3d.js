@@ -1101,19 +1101,34 @@ class MundoKnifeGame3D {
         player._prevAnimX = player.x;
         player._prevAnimZ = player.z;
         
-        const rawSpeed = dt > 0 ? dist / dt : 0;
-        const prevFiltered = player._animSpeedFiltered ?? rawSpeed;
+        const dtSafe = dt > 0 ? dt : 1 / 60;
+        let rawSpeed = dist / dtSafe;
+        
+        const noiseSpeed = 1.0;
+        if (rawSpeed < noiseSpeed) {
+            rawSpeed = 0;
+        }
+        
+        const prevFiltered = player._animSpeedFiltered ?? 0;
         const alpha = 0.3;
         const filteredSpeed = prevFiltered * (1 - alpha) + rawSpeed * alpha;
         player._animSpeedFiltered = filteredSpeed;
         
+        const lowSpeedThreshold = 1.0;
+        if (rawSpeed < lowSpeedThreshold) {
+            player._lowSpeedTime = (player._lowSpeedTime || 0) + dtSafe;
+        } else {
+            player._lowSpeedTime = 0;
+        }
+        
         const enterRunSpeed = 5;
         const exitRunSpeed = 2;
+        const lowSpeedDuration = 0.25;
         
         let isActuallyMoving = player._isAnimMoving ?? false;
         if (!isActuallyMoving && filteredSpeed > enterRunSpeed) {
             isActuallyMoving = true;
-        } else if (isActuallyMoving && filteredSpeed < exitRunSpeed) {
+        } else if (isActuallyMoving && filteredSpeed < exitRunSpeed && (player._lowSpeedTime || 0) > lowSpeedDuration) {
             isActuallyMoving = false;
         }
         player._isAnimMoving = isActuallyMoving;
@@ -1124,9 +1139,9 @@ class MundoKnifeGame3D {
             desiredState = 'run';
         }
         
-        player._animStateTime = (player._animStateTime || 0) + dt;
+        player._animStateTime = (player._animStateTime || 0) + dtSafe;
         
-        if (player.animationState !== desiredState && player._animStateTime > 0.15) {
+        if (player.animationState !== desiredState && player._animStateTime > 0.2) {
             player._animStateTime = 0;
             const oldAnimation = player.currentAnimation;
             const newAnimation = player.animations[desiredState];
