@@ -2639,32 +2639,13 @@ class MundoKnifeGame3D {
                     }
                     
                     if (team === this.myTeam) {
-                        if (this.NETCODE.reconciliation && this.reconciler && this.inputBuffer && serverPlayer.lastProcessedSeq !== undefined) {
-                            this.inputBuffer.acknowledge(serverPlayer.lastProcessedSeq);
-                            
-                            const unackedInputs = this.inputBuffer.getUnacknowledgedInputs();
-                            
-                            this.reconciler.reconcile({
-                                x: serverPlayer.x,
-                                z: serverPlayer.z,
-                                health: serverPlayer.health,
-                                isDead: serverPlayer.isDead
-                            }, unackedInputs);
-                        } else {
-                            const dx = this.playerSelf.x - serverPlayer.x;
-                            const dz = this.playerSelf.z - serverPlayer.z;
-                            const positionErrorSq = dx * dx + dz * dz;
-                            
-                            if (positionErrorSq > 25) {
-                                this.playerSelf.x = serverPlayer.x;
-                                this.playerSelf.z = serverPlayer.z;
-                            }
-                            
-                            const timeSinceLastInput = Date.now() - this.lastMoveInputTime;
-                            if (serverPlayer.targetX != null && serverPlayer.targetZ != null && timeSinceLastInput > 100) {
-                                this.playerSelf.targetX = serverPlayer.targetX;
-                                this.playerSelf.targetZ = serverPlayer.targetZ;
-                            }
+                        const dx = this.playerSelf.x - serverPlayer.x;
+                        const dz = this.playerSelf.z - serverPlayer.z;
+                        const positionErrorSq = dx * dx + dz * dz;
+                        
+                        if (positionErrorSq > 100) {
+                            this.playerSelf.x = serverPlayer.x;
+                            this.playerSelf.z = serverPlayer.z;
                         }
                     } else if (team === this.opponentTeam) {
                         const now = Date.now();
@@ -2804,9 +2785,6 @@ class MundoKnifeGame3D {
             this.accumulator -= this.fixedDt;
         }
         
-        if (this.reconciler) {
-            this.reconciler.updateSmoothing();
-        }
         
         [...this.team1, ...this.team2].forEach(player => {
             if (player && player.mixer) {
