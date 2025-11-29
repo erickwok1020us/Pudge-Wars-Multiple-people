@@ -1097,12 +1097,26 @@ class MundoKnifeGame3D {
         const prevZ = player._prevAnimZ ?? player.z;
         const dx = player.x - prevX;
         const dz = player.z - prevZ;
-        const distSq = dx * dx + dz * dz;
-        const movingEpsilonSq = 0.01;
-        const isActuallyMoving = distSq > movingEpsilonSq;
-        
+        const dist = Math.sqrt(dx * dx + dz * dz);
         player._prevAnimX = player.x;
         player._prevAnimZ = player.z;
+        
+        const rawSpeed = dt > 0 ? dist / dt : 0;
+        const prevFiltered = player._animSpeedFiltered ?? rawSpeed;
+        const alpha = 0.3;
+        const filteredSpeed = prevFiltered * (1 - alpha) + rawSpeed * alpha;
+        player._animSpeedFiltered = filteredSpeed;
+        
+        const enterRunSpeed = 5;
+        const exitRunSpeed = 2;
+        
+        let isActuallyMoving = player._isAnimMoving ?? false;
+        if (!isActuallyMoving && filteredSpeed > enterRunSpeed) {
+            isActuallyMoving = true;
+        } else if (isActuallyMoving && filteredSpeed < exitRunSpeed) {
+            isActuallyMoving = false;
+        }
+        player._isAnimMoving = isActuallyMoving;
         
         if (player.health <= 0) {
             desiredState = 'death';
@@ -1110,7 +1124,10 @@ class MundoKnifeGame3D {
             desiredState = 'run';
         }
         
-        if (player.animationState !== desiredState) {
+        player._animStateTime = (player._animStateTime || 0) + dt;
+        
+        if (player.animationState !== desiredState && player._animStateTime > 0.15) {
+            player._animStateTime = 0;
             const oldAnimation = player.currentAnimation;
             const newAnimation = player.animations[desiredState];
             
