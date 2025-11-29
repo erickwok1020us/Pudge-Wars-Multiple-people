@@ -1837,8 +1837,8 @@ class MundoKnifeGame3D {
             knife.mesh.position.z += knife.vz;
             knife.mesh.rotation.z += 0.3;
             
-            const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerSelf;
-            const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerOpponent;
+            const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.myTeam;
+            const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.opponentTeam;
             
             if (isLocalPlayerKnife || isOpponentKnife) {
                 this.checkKnifeCollisions(knife, i);
@@ -1905,8 +1905,8 @@ class MundoKnifeGame3D {
     }
 
     checkKnifeCollisions(knife, knifeIndex) {
-        const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerSelf;
-        const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower === this.playerOpponent;
+        const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.myTeam;
+        const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.opponentTeam;
         
         if (this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife) {
             return;
@@ -2501,10 +2501,10 @@ class MundoKnifeGame3D {
             
             // Check if this hit was already predicted by the local player
             // If so, skip duplicate blood/sound effects
-            const isLocalOwner = knife && knife.thrower && knife.thrower === this.playerSelf;
+            const isLocalOwner = knife && knife.thrower && knife.thrower.team === this.myTeam;
             const alreadyPredicted = knife && knife.predictedHit;
             
-            if (!(isLocalOwner && alreadyPredicted)) {
+            if (!alreadyPredicted) {
                 // Only play blood/sound if this client did NOT already predict this hit
                 this.createBloodEffect(hitX, hitY, hitZ);
                 
