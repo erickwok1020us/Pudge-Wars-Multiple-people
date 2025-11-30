@@ -1749,16 +1749,25 @@ class MundoKnifeGame3D {
             const dz = player.targetZ - player.z;
             const distance = Math.sqrt(dx * dx + dz * dz);
             
-            if (distance > 0.1) {
-                const newX = player.x + (dx / distance) * player.moveSpeed;
-                const newZ = player.z + (dz / distance) * player.moveSpeed;
+            if (distance > 0.001) {
+                const step = Math.min(distance, player.moveSpeed);
+                const stepX = (dx / distance) * step;
+                const stepZ = (dz / distance) * step;
                 
-                player.x = newX;
-                player.z = newZ;
+                player.x += stepX;
+                player.z += stepZ;
                 player.facing = dx > 0 ? 1 : -1;
                 
                 const angle = Math.atan2(dz, dx);
                 player.rotation = -angle + Math.PI / 2;
+                
+                if (distance <= player.moveSpeed) {
+                    player.x = player.targetX;
+                    player.z = player.targetZ;
+                    player.isMoving = false;
+                    player.targetX = null;
+                    player.targetZ = null;
+                }
             } else {
                 player.isMoving = false;
                 player.targetX = null;
