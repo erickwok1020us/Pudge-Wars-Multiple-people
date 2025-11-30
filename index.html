@@ -339,6 +339,9 @@
         }
 
         .version-display {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
             font-size: 12px;
             color: rgba(255, 255, 255, 0.7);
             font-family: monospace;
@@ -346,8 +349,7 @@
             background: rgba(0, 0, 0, 0.5);
             padding: 4px 10px;
             border-radius: 4px;
-            margin-top: 20px;
-            z-index: 10;
+            z-index: 400;
         }
 
         .main-menu {
@@ -1048,7 +1050,7 @@
             <button class="menu-btn" onclick="playButtonClickSound(); showModeSelection()">Practise with AI</button>
             <button class="menu-btn" onclick="playButtonClickSound(); showSettings()" style="font-size: 0.9rem; padding: 8px 16px; margin-top: 10px;">⚙️ Settings</button>
         </div>
-        <div class="version-display">PR#29</div>
+        <div class="version-display">PR#30</div>
     </div>
 
     <div class="room-interface" id="settingsInterface" style="display: none;">
