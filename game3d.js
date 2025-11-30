@@ -1209,13 +1209,31 @@ class MundoKnifeGame3D {
             const groundY = this.groundSurfaceY || 0;
             const characterCenterY = groundY + (this.characterSize / 2);
             
+            const desiredTargetX = this.playerSelf.x;
+            const desiredTargetY = characterCenterY;
+            const desiredTargetZ = this.playerSelf.z;
+            
+            if (!this.cameraTarget) {
+                this.cameraTarget = new THREE.Vector3(desiredTargetX, desiredTargetY, desiredTargetZ);
+            }
+            if (!this.cameraOffset) {
+                this.cameraOffset = new THREE.Vector3(0, 90, 75);
+            }
+            if (!this.cameraLerpSpeed) {
+                this.cameraLerpSpeed = 0.15;
+            }
+            
+            this.cameraTarget.x += (desiredTargetX - this.cameraTarget.x) * this.cameraLerpSpeed;
+            this.cameraTarget.y += (desiredTargetY - this.cameraTarget.y) * this.cameraLerpSpeed;
+            this.cameraTarget.z += (desiredTargetZ - this.cameraTarget.z) * this.cameraLerpSpeed;
+            
             this.camera.position.set(
-                this.playerSelf.x,
-                characterCenterY + 90,
-                this.playerSelf.z + 75
+                this.cameraTarget.x + this.cameraOffset.x,
+                this.cameraTarget.y + this.cameraOffset.y,
+                this.cameraTarget.z + this.cameraOffset.z
             );
             
-            this.camera.lookAt(this.playerSelf.x, characterCenterY, this.playerSelf.z);
+            this.camera.lookAt(this.cameraTarget.x, this.cameraTarget.y, this.cameraTarget.z);
         }
     }
 
