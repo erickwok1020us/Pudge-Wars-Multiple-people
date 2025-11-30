@@ -1100,7 +1100,7 @@ class MundoKnifeGame3D {
         
         if (isLocalPlayer) {
             isActuallyMoving = !!player.isMoving;
-            minStateTime = 0.05;
+            minStateTime = 0.15;
         } else {
             const prevX = player._prevAnimX ?? player.x;
             const prevZ = player._prevAnimZ ?? player.z;
@@ -1155,12 +1155,14 @@ class MundoKnifeGame3D {
             const oldAnimation = player.currentAnimation;
             const newAnimation = player.animations[desiredState];
             
+            const fadeTime = isLocalPlayer ? 0.05 : 0.2;
+            
             if (oldAnimation) {
-                oldAnimation.fadeOut(0.2);
+                oldAnimation.fadeOut(fadeTime);
             }
             
             if (newAnimation) {
-                newAnimation.reset().fadeIn(0.2);
+                newAnimation.reset().fadeIn(fadeTime);
                 
                 if (desiredState === 'death') {
                     newAnimation.setLoop(THREE.LoopOnce);
