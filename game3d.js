@@ -1234,13 +1234,13 @@ class MundoKnifeGame3D {
             if (!this.cameraOffset) {
                 this.cameraOffset = new THREE.Vector3(0, 90, 75);
             }
-            if (!this.cameraLerpSpeed) {
-                this.cameraLerpSpeed = 0.15;
-            }
             
-            this.cameraTarget.x += (desiredTargetX - this.cameraTarget.x) * this.cameraLerpSpeed;
-            this.cameraTarget.y += (desiredTargetY - this.cameraTarget.y) * this.cameraLerpSpeed;
-            this.cameraTarget.z += (desiredTargetZ - this.cameraTarget.z) * this.cameraLerpSpeed;
+            const isMoving = this.playerSelf.isMoving;
+            const lerpSpeed = isMoving ? 0.5 : 0.15;
+            
+            this.cameraTarget.x += (desiredTargetX - this.cameraTarget.x) * lerpSpeed;
+            this.cameraTarget.y += (desiredTargetY - this.cameraTarget.y) * lerpSpeed;
+            this.cameraTarget.z += (desiredTargetZ - this.cameraTarget.z) * lerpSpeed;
             
             this.camera.position.set(
                 this.cameraTarget.x + this.cameraOffset.x,
