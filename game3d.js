@@ -1155,22 +1155,35 @@ class MundoKnifeGame3D {
             const oldAnimation = player.currentAnimation;
             const newAnimation = player.animations[desiredState];
             
-            const fadeTime = isLocalPlayer ? 0.05 : 0.2;
-            
-            if (oldAnimation) {
-                oldAnimation.fadeOut(fadeTime);
-            }
-            
-            if (newAnimation) {
-                newAnimation.reset().fadeIn(fadeTime);
-                
-                if (desiredState === 'death') {
-                    newAnimation.setLoop(THREE.LoopOnce);
-                    newAnimation.clampWhenFinished = true;
+            if (isLocalPlayer) {
+                if (oldAnimation) {
+                    oldAnimation.stop();
+                    oldAnimation.enabled = false;
                 }
-                
-                newAnimation.play();
-                player.currentAnimation = newAnimation;
+                if (newAnimation) {
+                    newAnimation.reset();
+                    newAnimation.enabled = true;
+                    if (desiredState === 'death') {
+                        newAnimation.setLoop(THREE.LoopOnce);
+                        newAnimation.clampWhenFinished = true;
+                    }
+                    newAnimation.play();
+                    player.currentAnimation = newAnimation;
+                }
+            } else {
+                const fadeTime = 0.2;
+                if (oldAnimation) {
+                    oldAnimation.fadeOut(fadeTime);
+                }
+                if (newAnimation) {
+                    newAnimation.reset().fadeIn(fadeTime);
+                    if (desiredState === 'death') {
+                        newAnimation.setLoop(THREE.LoopOnce);
+                        newAnimation.clampWhenFinished = true;
+                    }
+                    newAnimation.play();
+                    player.currentAnimation = newAnimation;
+                }
             }
             
             player.animationState = desiredState;
