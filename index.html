@@ -1050,7 +1050,7 @@
             <button class="menu-btn" onclick="playButtonClickSound(); showModeSelection()">Practise with AI</button>
             <button class="menu-btn" onclick="playButtonClickSound(); showSettings()" style="font-size: 0.9rem; padding: 8px 16px; margin-top: 10px;">⚙️ Settings</button>
         </div>
-        <div class="version-display">PR#35</div>
+        <div class="version-display">PR#36</div>
     </div>
 
     <div class="room-interface" id="settingsInterface" style="display: none;">
@@ -1335,41 +1335,38 @@
             }
         }
         
+        let audioUnmuteAttempted = false;
+        
         function tryUnmuteAudio() {
             const audio = document.getElementById('mainMenuAudio');
-            if (audio && !audioUnmuted) {
+            if (audio && !audioUnmuted && !audioUnmuteAttempted) {
+                audioUnmuteAttempted = true;
                 audio.muted = false;
                 audio.volume = 0.5;
                 audio.play().then(() => {
                     audioUnmuted = true;
                     console.log('Audio unmuted and playing');
                 }).catch(err => {
-                    console.log('Audio unmute blocked, will retry on user interaction:', err);
+                    audioUnmuteAttempted = false;
                 });
             }
         }
         
         window.addEventListener('DOMContentLoaded', () => {
-            // Try to unmute immediately (will likely fail due to browser policy)
             tryUnmuteAudio();
             
-            // Unmute on first user interaction
             const unmuteOnInteraction = () => {
                 tryUnmuteAudio();
                 if (audioUnmuted) {
                     document.removeEventListener('click', unmuteOnInteraction);
                     document.removeEventListener('keydown', unmuteOnInteraction);
                     document.removeEventListener('touchstart', unmuteOnInteraction);
-                    document.removeEventListener('mousemove', unmuteOnInteraction);
-                    document.removeEventListener('mouseenter', unmuteOnInteraction);
                 }
             };
             
             document.addEventListener('click', unmuteOnInteraction);
             document.addEventListener('keydown', unmuteOnInteraction);
             document.addEventListener('touchstart', unmuteOnInteraction);
-            document.addEventListener('mousemove', unmuteOnInteraction);
-            document.addEventListener('mouseenter', unmuteOnInteraction);
         });
         
         // Socket.IO client library (loaded below) will provide the real io() function
