@@ -1,5 +1,15 @@
 const CDN_BASE_URL = 'https://pub-2d994ab822d5426bad338ecb218683d8.r2.dev';
 
+// Debug flag - set to false in production to disable verbose logging
+const DEBUG = false;
+
+// Helper function for debug logging - only logs when DEBUG is true
+function debugLog(...args) {
+    if (DEBUG) {
+        console.log(...args);
+    }
+}
+
 let preloadedAssets = {
     characterModel: null,
     animations: {},
@@ -3032,6 +3042,11 @@ class MundoKnifeGame3D {
         console.log('[DISPOSE] Cleaning up game instance');
         this.gameState.isRunning = false;
         this.stopLatencyMeasurement();
+        
+        // Stop TimeSync timer to prevent background interval from running after game ends
+        if (this.timeSync) {
+            this.timeSync.stop();
+        }
         
         if (this.eventListeners.documentContextMenu) {
             document.removeEventListener('contextmenu', this.eventListeners.documentContextMenu, true);
