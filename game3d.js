@@ -2030,18 +2030,16 @@ class MundoKnifeGame3D {
         }
     }
 
-    // Interpolate all remote opponents for 3v3 mode
+    // Interpolate all remote players for 3v3 mode (teammates + opponents = 5 players)
     interpolateAllRemotePlayers() {
         const serverNow = Date.now() - this.serverTimeOffset;
         const renderTime = serverNow - this.interpolationDelay;
         
         for (const [playerId, player] of this.playersById.entries()) {
-            // Skip self
+            // Skip self - only interpolate remote players
             if (player === this.playerSelf) continue;
             
-            // Only interpolate opponents (not teammates)
-            if (Number(player.team) !== this.opponentTeam) continue;
-            
+            // Interpolate ALL remote players (both teammates and opponents)
             const snapshots = this.remotePlayerSnapshots.get(playerId);
             if (!snapshots || snapshots.length < 2) continue;
             
@@ -2829,6 +2827,10 @@ class MundoKnifeGame3D {
         });
         
         socket.on('serverGameState', (data) => {
+            // Reset per-frame flags for 3v3 optimization
+            this._serverTimeOffsetUpdatedThisFrame = false;
+            this._networkStatsUpdatedThisFrame = false;
+            
             if (this.debugSync && data.serverTime) {
                 const clientTime = Date.now();
                 const offset = clientTime - data.serverTime;
@@ -2852,7 +2854,12 @@ class MundoKnifeGame3D {
                         }
                     }
                     
-                    if (team === this.myTeam) {
+                    // Check if this serverPlayer is self (by playerId)
+                    const isSelf = serverPlayer.playerId && this.playerSelf && 
+                                   serverPlayer.playerId === this.playerSelf.playerId;
+                    
+                    if (isSelf) {
+                        // Only apply position correction to self player
                         // Disabled small position corrections to prevent micro-teleporting/stuttering
                         // Host movement is client-authoritative for smooth gameplay
                         // Only correct for very large errors (>2500 sq units = 50 units distance)
@@ -2865,12 +2872,17 @@ class MundoKnifeGame3D {
                             this.playerSelf.x = serverPlayer.x;
                             this.playerSelf.z = serverPlayer.z;
                         }
-                    }else if (team === this.opponentTeam) {
+                    } else {
+                        // This is a remote player (teammate or opponent)
                         const now = Date.now();
                         const playerId = serverPlayer.playerId;
                         
-                        const rawOffset = now - data.serverTime;
-                        this.serverTimeOffset = this.serverTimeOffset * 0.9 + rawOffset * 0.1;
+                        // Update server time offset (only need to do once per serverGameState)
+                        if (!this._serverTimeOffsetUpdatedThisFrame) {
+                            const rawOffset = now - data.serverTime;
+                            this.serverTimeOffset = this.serverTimeOffset * 0.9 + rawOffset * 0.1;
+                            this._serverTimeOffsetUpdatedThisFrame = true;
+                        }
                         
                         const snapshot = {
                             timestamp: data.serverTime,
@@ -2881,7 +2893,7 @@ class MundoKnifeGame3D {
                             isMoving: serverPlayer.isMoving
                         };
                         
-                        // For 3v3 mode: use per-player snapshot buffers
+                        // For 3v3 mode: use per-player snapshot buffers for ALL remote players (teammates + opponents)
                         if (this.gameMode === '3v3' && playerId) {
                             let playerBuffer = this.remotePlayerSnapshots.get(playerId);
                             if (!playerBuffer) {
@@ -2894,42 +2906,48 @@ class MundoKnifeGame3D {
                             }
                         }
                         
-                        // For 1v1 mode: use single opponentSnapshots array (backward compatible)
-                        this.opponentSnapshots.push(snapshot);
+                        // For 1v1 mode: use single opponentSnapshots array (backward compatible, only for opponents)
+                        if (team === this.opponentTeam) {
+                            this.opponentSnapshots.push(snapshot);
+                            
+                            if (this.opponentSnapshots.length > this.snapshotLimit) {
+                                this.opponentSnapshots.shift();
+                            }
+                        }
                         
                         if (this.debugSync) {
-                            console.log(`[SYNC-DEBUG] Pushed snapshot - playerId:${playerId}, count:${this.opponentSnapshots.length}, serverTime:${data.serverTime}, offset:${this.serverTimeOffset.toFixed(2)}ms`);
+                            console.log(`[SYNC-DEBUG] Pushed snapshot - playerId:${playerId}, team:${team}, count:${this.remotePlayerSnapshots.get(playerId)?.length || 0}, serverTime:${data.serverTime}`);
                         }
                         
-                        this.networkStats.lastUpdateTimes.push(now);
-                        if (this.networkStats.lastUpdateTimes.length > 20) {
-                            this.networkStats.lastUpdateTimes.shift();
-                        }
-                        
-                        // Calculate inter-arrival times for jitter measurement
-                        if (this.networkStats.lastUpdateTimes.length >= 2) {
-                            const lastIdx = this.networkStats.lastUpdateTimes.length - 1;
-                            const interArrival = this.networkStats.lastUpdateTimes[lastIdx] - this.networkStats.lastUpdateTimes[lastIdx - 1];
-                            this.networkStats.interArrivalTimes.push(interArrival);
-                            if (this.networkStats.interArrivalTimes.length > 100) {
-                                this.networkStats.interArrivalTimes.shift();
+                        // Update network stats (only once per frame, not per player)
+                        if (!this._networkStatsUpdatedThisFrame) {
+                            this.networkStats.lastUpdateTimes.push(now);
+                            if (this.networkStats.lastUpdateTimes.length > 20) {
+                                this.networkStats.lastUpdateTimes.shift();
                             }
                             
-                            // Calculate percentiles every 50 samples
-                            if (this.networkStats.interArrivalTimes.length >= 50 && this.networkStats.interArrivalTimes.length % 50 === 0) {
-                                const sorted = [...this.networkStats.interArrivalTimes].sort((a, b) => a - b);
-                                this.networkStats.p50 = sorted[Math.floor(sorted.length * 0.5)];
-                                this.networkStats.p95 = sorted[Math.floor(sorted.length * 0.95)];
-                                this.networkStats.p99 = sorted[Math.floor(sorted.length * 0.99)];
-                                console.log(`[JITTER] p50: ${this.networkStats.p50.toFixed(1)}ms, p95: ${this.networkStats.p95.toFixed(1)}ms, p99: ${this.networkStats.p99.toFixed(1)}ms`);
+                            // Calculate inter-arrival times for jitter measurement
+                            if (this.networkStats.lastUpdateTimes.length >= 2) {
+                                const lastIdx = this.networkStats.lastUpdateTimes.length - 1;
+                                const interArrival = this.networkStats.lastUpdateTimes[lastIdx] - this.networkStats.lastUpdateTimes[lastIdx - 1];
+                                this.networkStats.interArrivalTimes.push(interArrival);
+                                if (this.networkStats.interArrivalTimes.length > 100) {
+                                    this.networkStats.interArrivalTimes.shift();
+                                }
+                                
+                                // Calculate percentiles every 50 samples
+                                if (this.networkStats.interArrivalTimes.length >= 50 && this.networkStats.interArrivalTimes.length % 50 === 0) {
+                                    const sorted = [...this.networkStats.interArrivalTimes].sort((a, b) => a - b);
+                                    this.networkStats.p50 = sorted[Math.floor(sorted.length * 0.5)];
+                                    this.networkStats.p95 = sorted[Math.floor(sorted.length * 0.95)];
+                                    this.networkStats.p99 = sorted[Math.floor(sorted.length * 0.99)];
+                                    console.log(`[JITTER] p50: ${this.networkStats.p50.toFixed(1)}ms, p95: ${this.networkStats.p95.toFixed(1)}ms, p99: ${this.networkStats.p99.toFixed(1)}ms`);
+                                }
                             }
+                            
+                            this.updateAdaptiveInterpolationDelay();
+                            this._networkStatsUpdatedThisFrame = true;
                         }
-                        
-                        if (this.opponentSnapshots.length > this.snapshotLimit) {
-                            this.opponentSnapshots.shift();
-                        }
-                        
-                        this.updateAdaptiveInterpolationDelay();
                     }
                 });
             }
