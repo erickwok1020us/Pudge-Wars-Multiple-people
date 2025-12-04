@@ -2694,6 +2694,8 @@ class MundoKnifeGame3D {
         });
         
         // Phase 3: Movement reconciliation with server acknowledgments
+        // Disabled small corrections to prevent micro-teleporting/stuttering
+        // Only correct for very large errors (e.g., respawn, teleport)
         socket.on('serverMoveAck', (data) => {
             if (!data.actionId) return;
             
@@ -2701,25 +2703,10 @@ class MundoKnifeGame3D {
                 return;
             }
             
-            const serverX = data.x;
-            const serverZ = data.z;
-            const errorThreshold = 5.0;
-            
-            const errorDist = Math.sqrt(
-                Math.pow(this.playerSelf.x - serverX, 2) + 
-                Math.pow(this.playerSelf.z - serverZ, 2)
-            );
-            
-            if (errorDist > errorThreshold) {
-                console.log(`[MOVE-RECONCILE] Position mismatch detected: ${errorDist.toFixed(2)} units, correcting to server position`);
-                this.playerSelf.x = serverX;
-                this.playerSelf.z = serverZ;
-                
-                if (this.playerSelf.mesh) {
-                    this.playerSelf.mesh.position.x = serverX;
-                    this.playerSelf.mesh.position.z = serverZ;
-                }
-            }
+            // Disabled: small position corrections cause visible stuttering
+            // The host's movement is client-authoritative for smooth gameplay
+            // Only very large errors (>50 units) would indicate a real desync
+            // that needs correction (e.g., respawn position)
         });
         
         socket.on('serverKnifeDestroy', (data) => {
@@ -2759,15 +2746,19 @@ class MundoKnifeGame3D {
                     }
                     
                     if (team === this.myTeam) {
+                        // Disabled small position corrections to prevent micro-teleporting/stuttering
+                        // Host movement is client-authoritative for smooth gameplay
+                        // Only correct for very large errors (>2500 sq units = 50 units distance)
+                        // which would indicate a real desync (e.g., respawn, teleport)
                         const dx = this.playerSelf.x - serverPlayer.x;
                         const dz = this.playerSelf.z - serverPlayer.z;
                         const positionErrorSq = dx * dx + dz * dz;
                         
-                        if (positionErrorSq > 100) {
+                        if (positionErrorSq > 2500) {
                             this.playerSelf.x = serverPlayer.x;
                             this.playerSelf.z = serverPlayer.z;
                         }
-                    } else if (team === this.opponentTeam) {
+                    }else if (team === this.opponentTeam) {
                         const now = Date.now();
                         
                         const rawOffset = now - data.serverTime;
