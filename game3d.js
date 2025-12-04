@@ -2584,6 +2584,7 @@ class MundoKnifeGame3D {
         socket.off('serverKnifeHit');
         socket.off('serverKnifeDestroy');
         socket.off('serverGameState');
+        socket.off('serverMoveAck');
         socket.off('opponentKnifeThrow');
         socket.off('serverHealthUpdate');
         socket.off('opponentHealthUpdate');
@@ -2593,6 +2594,10 @@ class MundoKnifeGame3D {
         socket.off('allPlayersLoaded');
         
         socket.on('opponentMove', (data) => {
+            if (!this.playerOpponent) {
+                console.warn('[OPPONENT-MOVE] Received move before playerOpponent was initialized');
+                return;
+            }
             this.playerOpponent.targetX = data.targetX;
             this.playerOpponent.targetZ = data.targetZ;
             this.playerOpponent.isMoving = true;
@@ -2812,6 +2817,10 @@ class MundoKnifeGame3D {
         });
         
         socket.on('opponentKnifeThrow', (data) => {
+            if (!this.playerOpponent) {
+                console.warn('[OPPONENT-KNIFE] Received knife throw before playerOpponent was initialized');
+                return;
+            }
             this.createKnife3DTowards(this.playerOpponent, data.targetX, data.targetZ, null);
             this.playerOpponent.lastKnifeTime = Date.now();
         });
