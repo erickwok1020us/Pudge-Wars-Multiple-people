@@ -1751,7 +1751,6 @@ class MundoKnifeGame3D {
         }
         
         if (this.isMultiplayer && player === this.playerOpponent) {
-            this.interpolateOpponentPosition();
             return;
         }
         
@@ -2900,6 +2899,10 @@ class MundoKnifeGame3D {
         });
         
         if (this.gameState.isRunning || this.gameState.countdownActive) {
+            if (this.isMultiplayer && this.playerOpponent) {
+                this.interpolateOpponentPosition();
+            }
+            
             [...this.team1, ...this.team2].forEach(player => {
                 if (player && player.mesh) {
                     player.mesh.position.x = player.x;
