@@ -1122,19 +1122,19 @@ class MundoKnifeGame3D {
             
             let rawSpeed = dist / dtSafe;
             
-            const noiseSpeed = 3.0;
+            const noiseSpeed = 2.0;
             if (rawSpeed < noiseSpeed) {
                 rawSpeed = 0;
             }
             
             const prevFiltered = player._animSpeedFiltered ?? 0;
-            const alpha = 0.3;
+            const alpha = 0.4;
             const filteredSpeed = prevFiltered * (1 - alpha) + rawSpeed * alpha;
             player._animSpeedFiltered = filteredSpeed;
             
-            const enterRunSpeed = 5;
-            const exitRunSpeed = 2;
-            const lowSpeedDuration = 0.25;
+            const enterRunSpeed = 4;
+            const exitRunSpeed = 1.5;
+            const lowSpeedDuration = 0.05;
             
             if (filteredSpeed < exitRunSpeed) {
                 player._lowSpeedTime = (player._lowSpeedTime || 0) + dtSafe;
@@ -1150,6 +1150,7 @@ class MundoKnifeGame3D {
             }
             player._isAnimMoving = prevMoving;
             isActuallyMoving = prevMoving;
+            minStateTime = 0.05;
         }
         
         if (player.health <= 0) {
