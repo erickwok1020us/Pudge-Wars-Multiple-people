@@ -1229,7 +1229,7 @@ class MundoKnifeGame3D {
         this.cameraLocked = true;
     }
 
-    updateCamera() {
+    updateCamera(dt) {
         if (this.playerSelf) {
             const groundY = this.groundSurfaceY || 0;
             const characterCenterY = groundY + (this.characterSize / 2);
@@ -1246,11 +1246,12 @@ class MundoKnifeGame3D {
             }
             
             const isMoving = this.playerSelf.isMoving;
-            const lerpSpeed = isMoving ? 0.5 : 0.15;
+            const speedPerSecond = isMoving ? 12 : 5;
+            const lerpFactor = Math.min(1, speedPerSecond * dt);
             
-            this.cameraTarget.x += (desiredTargetX - this.cameraTarget.x) * lerpSpeed;
-            this.cameraTarget.y += (desiredTargetY - this.cameraTarget.y) * lerpSpeed;
-            this.cameraTarget.z += (desiredTargetZ - this.cameraTarget.z) * lerpSpeed;
+            this.cameraTarget.x += (desiredTargetX - this.cameraTarget.x) * lerpFactor;
+            this.cameraTarget.y += (desiredTargetY - this.cameraTarget.y) * lerpFactor;
+            this.cameraTarget.z += (desiredTargetZ - this.cameraTarget.z) * lerpFactor;
             
             this.camera.position.set(
                 this.cameraTarget.x + this.cameraOffset.x,
@@ -1750,7 +1751,6 @@ class MundoKnifeGame3D {
         }
         
         if (this.isMultiplayer && player === this.playerOpponent) {
-            this.interpolateOpponentPosition();
             return;
         }
         
@@ -2883,7 +2883,6 @@ class MundoKnifeGame3D {
         while (this.accumulator >= this.fixedDt) {
             if (this.gameState.isRunning || this.gameState.countdownActive) {
                 this.updatePlayers(this.fixedDt);
-                this.updateCamera();
                 if (this.gameState.isRunning) {
                     this.throwKnife();
                     this.updateKnives(this.fixedDt);
@@ -2893,7 +2892,6 @@ class MundoKnifeGame3D {
             this.accumulator -= this.fixedDt;
         }
         
-        
         [...this.team1, ...this.team2].forEach(player => {
             if (player && player.mixer) {
                 this.updatePlayerAnimation(player, frameTime);
@@ -2901,6 +2899,10 @@ class MundoKnifeGame3D {
         });
         
         if (this.gameState.isRunning || this.gameState.countdownActive) {
+            if (this.isMultiplayer && this.playerOpponent) {
+                this.interpolateOpponentPosition();
+            }
+            
             [...this.team1, ...this.team2].forEach(player => {
                 if (player && player.mesh) {
                     player.mesh.position.x = player.x;
@@ -2908,6 +2910,8 @@ class MundoKnifeGame3D {
                     player.mesh.rotation.y = player.rotation;
                 }
             });
+            
+            this.updateCamera(frameTime);
         }
         
         this.updateCooldownDisplay();
