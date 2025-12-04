@@ -211,10 +211,10 @@ class MundoKnifeGame3D {
         this.opponentSnapshots = [];
         this.snapshotLimit = 32; // Increased from 10 for better buffering
         
-        this.baseInterpolationDelay = 30; // Base delay in ms (reduced from 100ms)
-        this.interpolationDelay = 30;
-        this.minInterpolationDelay = 20;
-        this.maxInterpolationDelay = 70;
+        this.baseInterpolationDelay = 80; // Base delay in ms (increased for smoother interpolation)
+        this.interpolationDelay = 80;
+        this.minInterpolationDelay = 60;
+        this.maxInterpolationDelay = 150;
         
         this.networkStats = {
             lastUpdateTimes: [],
@@ -1829,6 +1829,10 @@ class MundoKnifeGame3D {
     interpolateOpponentPosition() {
         if (this.opponentSnapshots.length < 2) return;
         
+        if (!this.interpDebug) {
+            this.interpDebug = { lastMode: null, lastX: null, lastZ: null, modeChangeCount: 0 };
+        }
+        
         const serverNow = Date.now() - this.serverTimeOffset;
         const renderTime = serverNow - this.interpolationDelay;
         
@@ -1844,11 +1848,17 @@ class MundoKnifeGame3D {
             }
         }
         
+        let finalX, finalZ;
+        let currentMode;
+        
         if (!snapshot0 || !snapshot1) {
+            currentMode = 'EXTRAP';
             const latest = this.opponentSnapshots[this.opponentSnapshots.length - 1];
+            const behind = serverNow - latest.timestamp;
             
-            if (this.debugSync) {
-                console.log(`[SYNC-DEBUG] Extrapolating - renderTime:${renderTime}, latestTimestamp:${latest.timestamp}, behind:${serverNow - latest.timestamp}ms`);
+            if (this.interpDebug.lastMode !== 'EXTRAP') {
+                this.interpDebug.modeChangeCount++;
+                console.log(`[INTERP-MODE] EXTRAP behind=${behind.toFixed(0)}ms delay=${this.interpolationDelay.toFixed(0)}ms snapshots=${this.opponentSnapshots.length}`);
             }
             
             if (this.opponentSnapshots.length >= 2) {
@@ -1859,10 +1869,10 @@ class MundoKnifeGame3D {
                     const vx = (latest.x - prev.x) / dt;
                     const vz = (latest.z - prev.z) / dt;
                     
-                    const extrapolationTime = Math.min(100, serverNow - latest.timestamp);
+                    const extrapolationTime = Math.min(100, behind);
                     
-                    this.playerOpponent.x = latest.x + vx * extrapolationTime;
-                    this.playerOpponent.z = latest.z + vz * extrapolationTime;
+                    finalX = latest.x + vx * extrapolationTime;
+                    finalZ = latest.z + vz * extrapolationTime;
                     
                     if (Math.abs(vx) > 0.0001 || Math.abs(vz) > 0.0001) {
                         const angle = Math.atan2(vz, vx);
@@ -1870,63 +1880,64 @@ class MundoKnifeGame3D {
                         this.playerOpponent.facing = vx > 0 ? 1 : -1;
                     }
                 } else {
-                    this.playerOpponent.x = latest.x;
-                    this.playerOpponent.z = latest.z;
+                    finalX = latest.x;
+                    finalZ = latest.z;
                 }
             } else {
-                this.playerOpponent.x = latest.x;
-                this.playerOpponent.z = latest.z;
+                finalX = latest.x;
+                finalZ = latest.z;
             }
             
             this.playerOpponent.targetX = latest.targetX;
             this.playerOpponent.targetZ = latest.targetZ;
             this.playerOpponent.isMoving = latest.isMoving;
+        } else {
+            currentMode = 'INTERP';
             
-            if (this.playerOpponent.mesh) {
-                this.playerOpponent.mesh.position.x = this.playerOpponent.x;
-                this.playerOpponent.mesh.position.z = this.playerOpponent.z;
-                this.playerOpponent.mesh.rotation.y = this.playerOpponent.rotation;
-                
-                if (this.debugSync) {
-                    console.log(`[SYNC-DEBUG] Applied extrapolated position to mesh - x:${this.playerOpponent.x.toFixed(2)}, z:${this.playerOpponent.z.toFixed(2)}`);
-                }
+            if (this.interpDebug.lastMode !== 'INTERP') {
+                this.interpDebug.modeChangeCount++;
+                console.log(`[INTERP-MODE] INTERP delay=${this.interpolationDelay.toFixed(0)}ms snapshots=${this.opponentSnapshots.length}`);
             }
-            return;
+            
+            const timeDiff = snapshot1.timestamp - snapshot0.timestamp;
+            const t = timeDiff > 0 ? (renderTime - snapshot0.timestamp) / timeDiff : 0;
+            const clampedT = Math.max(0, Math.min(1, t));
+            
+            finalX = snapshot0.x + (snapshot1.x - snapshot0.x) * clampedT;
+            finalZ = snapshot0.z + (snapshot1.z - snapshot0.z) * clampedT;
+            
+            const dirX = snapshot1.x - snapshot0.x;
+            const dirZ = snapshot1.z - snapshot0.z;
+            if (Math.abs(dirX) > 0.001 || Math.abs(dirZ) > 0.001) {
+                const angle = Math.atan2(dirZ, dirX);
+                this.playerOpponent.rotation = -angle + Math.PI / 2;
+                this.playerOpponent.facing = dirX > 0 ? 1 : -1;
+            }
+            
+            this.playerOpponent.targetX = snapshot1.targetX;
+            this.playerOpponent.targetZ = snapshot1.targetZ;
+            this.playerOpponent.isMoving = snapshot1.isMoving;
         }
         
-        const timeDiff = snapshot1.timestamp - snapshot0.timestamp;
-        const t = timeDiff > 0 ? (renderTime - snapshot0.timestamp) / timeDiff : 0;
-        const clampedT = Math.max(0, Math.min(1, t));
-        
-        const interpolatedX = snapshot0.x + (snapshot1.x - snapshot0.x) * clampedT;
-        const interpolatedZ = snapshot0.z + (snapshot1.z - snapshot0.z) * clampedT;
-        
-        const dirX = snapshot1.x - snapshot0.x;
-        const dirZ = snapshot1.z - snapshot0.z;
-        if (Math.abs(dirX) > 0.001 || Math.abs(dirZ) > 0.001) {
-            const angle = Math.atan2(dirZ, dirX);
-            this.playerOpponent.rotation = -angle + Math.PI / 2;
-            this.playerOpponent.facing = dirX > 0 ? 1 : -1;
+        if (this.interpDebug.lastX !== null) {
+            const dx = finalX - this.interpDebug.lastX;
+            const dz = finalZ - this.interpDebug.lastZ;
+            const jumpDist = Math.sqrt(dx * dx + dz * dz);
+            if (jumpDist > 3) {
+                console.log(`[INTERP-JUMP] mode=${currentMode} dist=${jumpDist.toFixed(2)} x=${finalX.toFixed(2)} z=${finalZ.toFixed(2)}`);
+            }
         }
+        this.interpDebug.lastX = finalX;
+        this.interpDebug.lastZ = finalZ;
+        this.interpDebug.lastMode = currentMode;
         
-        if (this.debugSync) {
-            console.log(`[SYNC-DEBUG] Interpolating - renderTime:${renderTime}, s0:${snapshot0.timestamp}, s1:${snapshot1.timestamp}, t:${clampedT.toFixed(3)}, x:${interpolatedX.toFixed(2)}, z:${interpolatedZ.toFixed(2)}`);
-        }
-        
-        this.playerOpponent.x = interpolatedX;
-        this.playerOpponent.z = interpolatedZ;
-        this.playerOpponent.targetX = snapshot1.targetX;
-        this.playerOpponent.targetZ = snapshot1.targetZ;
-        this.playerOpponent.isMoving = snapshot1.isMoving;
+        this.playerOpponent.x = finalX;
+        this.playerOpponent.z = finalZ;
         
         if (this.playerOpponent.mesh) {
-            this.playerOpponent.mesh.position.x = interpolatedX;
-            this.playerOpponent.mesh.position.z = interpolatedZ;
+            this.playerOpponent.mesh.position.x = finalX;
+            this.playerOpponent.mesh.position.z = finalZ;
             this.playerOpponent.mesh.rotation.y = this.playerOpponent.rotation;
-            
-            if (this.debugSync) {
-                console.log(`[SYNC-DEBUG] Applied interpolated position to mesh - x:${interpolatedX.toFixed(2)}, z:${interpolatedZ.toFixed(2)}`);
-            }
         }
     }
 
