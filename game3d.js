@@ -474,6 +474,12 @@ class MundoKnifeGame3D {
             if (gameCanvas) {
                 gameCanvas.style.display = 'block';
             }
+            
+            // Initialize test runner if available (for automated testing)
+            if (typeof initTestRunner === 'function') {
+                initTestRunner(this);
+                console.log('Test runner initialized. Press F9 to toggle test UI.');
+            }
         });
     }
     
