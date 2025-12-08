@@ -633,6 +633,7 @@ Sliding Distance:
 
 // Global instance
 let testRunner = null;
+let _gameInstance = null;
 
 /**
  * Initialize test runner when game is ready
@@ -641,17 +642,175 @@ function initTestRunner(game) {
     if (testRunner) {
         testRunner.cleanup();
     }
+    _gameInstance = game;
     testRunner = new TestRunner(game);
     console.log('[TEST-RUNNER] Initialized. Press F9 to open test UI.');
+    console.log('[TEST-RUNNER] You can also run tests from console:');
+    console.log('  - runAllAutoTests()     : Run all tests (fully automatic)');
+    console.log('  - runAimingAutoTest()   : Run aiming test only');
+    console.log('  - runSlidingAutoTest()  : Run sliding test only');
     return testRunner;
+}
+
+/**
+ * Check if game is ready for testing
+ */
+function isGameReadyForTests() {
+    if (!_gameInstance) {
+        console.error('[AUTO-TEST] Game not initialized. Please start a game first.');
+        return false;
+    }
+    if (!_gameInstance.playerSelf) {
+        console.error('[AUTO-TEST] Player not available. Please start a game (AI mode or multiplayer) first.');
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Run all auto tests - fully automatic, no manual input required
+ * This is the main entry point for one-click testing
+ * 
+ * @param {Object} options - Optional configuration
+ * @param {boolean} options.showVisualization - Show visual markers (default: true)
+ * @param {number} options.aimingGridSize - Grid size for aiming test (default: 5)
+ * @param {number} options.slidingIterations - Iterations for sliding test (default: 10)
+ * @returns {Promise<Object>} Test results with passed boolean and detailed stats
+ */
+async function runAllAutoTests(options = {}) {
+    console.log('='.repeat(60));
+    console.log('[AUTO-TEST] Starting fully automatic test suite...');
+    console.log('[AUTO-TEST] No manual input required - just wait for results.');
+    console.log('='.repeat(60));
+    
+    if (!isGameReadyForTests()) {
+        return {
+            passed: false,
+            aiming: null,
+            sliding: null,
+            error: 'Game not ready. Please start a game first.'
+        };
+    }
+    
+    const config = {
+        showVisualization: options.showVisualization !== false,
+        aimingGridSize: options.aimingGridSize || 5,
+        slidingIterations: options.slidingIterations || 10
+    };
+    
+    const results = {
+        passed: false,
+        aiming: null,
+        sliding: null,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Run aiming test
+    console.log('\n[AUTO-TEST] === Phase 1: Aiming Accuracy Test ===');
+    console.log('[AUTO-TEST] Testing aim calculation at multiple screen positions...');
+    
+    const aimingTest = new AimingAutoTest(_gameInstance);
+    results.aiming = await aimingTest.runTest({
+        gridSize: config.aimingGridSize,
+        showVisualization: config.showVisualization
+    });
+    
+    // Clear visualization before next test
+    aimingTest.clearVisualization();
+    
+    // Small delay between tests
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Run sliding test
+    console.log('\n[AUTO-TEST] === Phase 2: Movement Stop / Sliding Test ===');
+    console.log('[AUTO-TEST] Testing movement stop timing and distance...');
+    
+    const slidingTest = new SlidingAutoTest(_gameInstance);
+    results.sliding = await slidingTest.runTest({
+        iterations: config.slidingIterations,
+        showVisualization: config.showVisualization
+    });
+    
+    // Calculate overall result
+    results.passed = (results.aiming?.passed ?? false) && (results.sliding?.passed ?? false);
+    
+    // Print summary
+    console.log('\n' + '='.repeat(60));
+    console.log('[AUTO-TEST] FINAL RESULTS');
+    console.log('='.repeat(60));
+    console.log(`Overall: ${results.passed ? 'PASS' : 'FAIL'}`);
+    console.log('-'.repeat(60));
+    console.log(`Aiming Test: ${results.aiming?.passed ? 'PASS' : 'FAIL'}`);
+    if (results.aiming) {
+        console.log(`  Max Error: ${results.aiming.maxError?.toFixed(4) || 'N/A'} units`);
+        console.log(`  Avg Error: ${results.aiming.avgError?.toFixed(4) || 'N/A'} units`);
+    }
+    console.log('-'.repeat(60));
+    console.log(`Sliding Test: ${results.sliding?.passed ? 'PASS' : 'FAIL'}`);
+    if (results.sliding) {
+        console.log(`  Avg Sliding Time: ${results.sliding.avgSlidingTime?.toFixed(2) || 'N/A'} ms`);
+        console.log(`  Max Sliding Time: ${results.sliding.maxSlidingTime?.toFixed(2) || 'N/A'} ms`);
+        console.log(`  Avg Sliding Distance: ${results.sliding.avgSlidingDistance?.toFixed(4) || 'N/A'} units`);
+    }
+    console.log('='.repeat(60));
+    
+    return results;
+}
+
+/**
+ * Run aiming auto test only - fully automatic
+ */
+async function runAimingAutoTest(options = {}) {
+    console.log('[AUTO-TEST] Starting aiming accuracy test...');
+    
+    if (!isGameReadyForTests()) {
+        return { passed: false, error: 'Game not ready' };
+    }
+    
+    const aimingTest = new AimingAutoTest(_gameInstance);
+    return await aimingTest.runTest({
+        gridSize: options.gridSize || 5,
+        showVisualization: options.showVisualization !== false,
+        ...options
+    });
+}
+
+/**
+ * Run sliding auto test only - fully automatic
+ */
+async function runSlidingAutoTest(options = {}) {
+    console.log('[AUTO-TEST] Starting sliding/stop test...');
+    
+    if (!isGameReadyForTests()) {
+        return { passed: false, error: 'Game not ready' };
+    }
+    
+    const slidingTest = new SlidingAutoTest(_gameInstance);
+    return await slidingTest.runTest({
+        iterations: options.iterations || 10,
+        showVisualization: options.showVisualization !== false,
+        ...options
+    });
 }
 
 // Export for use in game
 if (typeof window !== 'undefined') {
     window.TestRunner = TestRunner;
     window.initTestRunner = initTestRunner;
+    
+    // Global one-click test functions
+    window.runAllAutoTests = runAllAutoTests;
+    window.runAimingAutoTest = runAimingAutoTest;
+    window.runSlidingAutoTest = runSlidingAutoTest;
+    window.isGameReadyForTests = isGameReadyForTests;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { TestRunner, initTestRunner };
+    module.exports = { 
+        TestRunner, 
+        initTestRunner,
+        runAllAutoTests,
+        runAimingAutoTest,
+        runSlidingAutoTest
+    };
 }
