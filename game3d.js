@@ -3143,25 +3143,28 @@ class MundoKnifeGame3D {
                             }
                         }
                         
-                        // Store snapshot for interpolation
+                        // For 3v3 mode: use simple targetX/targetZ + lerp interpolation
+                        // Instead of complex snapshot-based interpolation, set target positions
+                        // and let the game loop smoothly lerp towards them
                         if (localPlayer) {
-                            let playerBuffer = this.remotePlayerSnapshots.get(playerId);
-                            if (!playerBuffer) {
-                                playerBuffer = [];
-                                this.remotePlayerSnapshots.set(playerId, playerBuffer);
+                            // Set target position for lerp interpolation (don't set x/z directly)
+                            localPlayer.serverTargetX = serverPlayer.x;
+                            localPlayer.serverTargetZ = serverPlayer.z;
+                            localPlayer.isMoving = serverPlayer.isMoving;
+                            
+                            // Initialize position if this is the first update
+                            if (localPlayer.x === undefined || localPlayer.z === undefined) {
+                                localPlayer.x = serverPlayer.x;
+                                localPlayer.z = serverPlayer.z;
                             }
-                            playerBuffer.push({
-                                timestamp: data.serverTime,
-                                x: serverPlayer.x,
-                                z: serverPlayer.z,
-                                targetX: serverPlayer.targetX,
-                                targetZ: serverPlayer.targetZ,
-                                isMoving: serverPlayer.isMoving,
-                                vx: serverPlayer.vx || 0,
-                                vz: serverPlayer.vz || 0
-                            });
-                            if (playerBuffer.length > this.snapshotLimit) {
-                                playerBuffer.shift();
+                            
+                            // Update rotation based on movement direction
+                            const vx = serverPlayer.vx || 0;
+                            const vz = serverPlayer.vz || 0;
+                            if (Math.abs(vx) > 0.001 || Math.abs(vz) > 0.001) {
+                                const angle = Math.atan2(vz, vx);
+                                localPlayer.rotation = -angle + Math.PI / 2;
+                                localPlayer.facing = vx > 0 ? 1 : -1;
                             }
                             
                             // Update health
@@ -3358,8 +3361,19 @@ class MundoKnifeGame3D {
             if (this.isMultiplayer) {
                 // Use different interpolation paths based on game mode
                 if (this.gameMode === '3v3') {
-                    // 3v3 mode: interpolate all remote players using per-player buffers
-                    this.interpolateAllRemotePlayers();
+                    // 3v3 mode: use simple lerp interpolation for all remote players
+                    // This is more reliable than snapshot-based interpolation
+                    const lerpAlpha = 0.2; // Smoothing factor (0.1 = slow, 0.3 = fast)
+                    [...this.team1, ...this.team2].forEach(player => {
+                        // Skip self - only interpolate remote players
+                        if (player === this.playerSelf) return;
+                        
+                        // Lerp towards server target position
+                        if (player.serverTargetX !== undefined && player.serverTargetZ !== undefined) {
+                            player.x += (player.serverTargetX - player.x) * lerpAlpha;
+                            player.z += (player.serverTargetZ - player.z) * lerpAlpha;
+                        }
+                    });
                 } else if (this.playerOpponent) {
                     // 1v1 mode: use single opponent interpolation (backward compatible)
                     this.interpolateOpponentPosition();
