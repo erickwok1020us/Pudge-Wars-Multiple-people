@@ -3153,6 +3153,10 @@ class MundoKnifeGame3D {
                             
                             // Update health
                             if (serverPlayer.health !== undefined) {
+                                // DEBUG: Track health changes to diagnose initial health bug
+                                if (localPlayer.health !== serverPlayer.health) {
+                                    console.log(`[HEALTH-CHANGE] Player ${serverPlayer.playerId} health: ${localPlayer.health} -> ${serverPlayer.health} (from serverGameState)`);
+                                }
                                 localPlayer.health = serverPlayer.health;
                             }
                         }
