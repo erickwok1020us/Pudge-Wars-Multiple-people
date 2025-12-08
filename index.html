@@ -510,7 +510,7 @@
 
         .room-content {
             background: var(--card-bg);
-            padding: 10px 10px 60px 10px;
+            padding: 10px 10px 40px 10px;
             border-radius: var(--border-radius);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -518,10 +518,12 @@
             max-width: 600px;
             width: 90%;
             position: fixed;
-            top: 55%;
+            top: 50%;
             z-index: 20;
             left: 50%;
-            transform: translateX(-50%);
+            transform: translate(-50%, -50%);
+            max-height: 85vh;
+            overflow-y: auto;
         }
 
         .room-code {
@@ -592,8 +594,8 @@
 
         .teams-container {
             display: flex;
-            gap: 20px;
-            margin: 20px 0;
+            gap: 15px;
+            margin: 10px 0;
             max-width: 600px;
             margin-left: auto;
             margin-right: auto;
@@ -603,7 +605,7 @@
             flex: 1;
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: var(--border-radius);
-            padding: 15px;
+            padding: 10px;
             background: rgba(255, 255, 255, 0.05);
         }
 
