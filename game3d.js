@@ -242,6 +242,18 @@ class MundoKnifeGame3D {
         this.debugSync = false;
         this.serverTimeOffset = 0;
         
+        // Debug flags for stop timing and aiming (set to true for debugging)
+        this.DEBUG_STOP = false; // Enable stop timing debug (set to true to see timing logs)
+        this.DEBUG_AIM = false; // Enable aiming visualization (set to true for debug)
+        this._debugStop = {
+            lastInputTime: 0,
+            serverStopTime: 0,
+            clientStopTime: 0,
+            lastServerIsMoving: false
+        };
+        this._aimDebugLine = null;
+        this._aimTargetMarker = null;
+        
         this.NETCODE = {
             prediction: true,
             reconciliation: true,
@@ -1339,6 +1351,31 @@ class MundoKnifeGame3D {
         window.addEventListener('resize', this.eventListeners.resize);
     }
 
+    /**
+     * Unified aim target calculation - converts screen coordinates to world position on aim plane
+     * This ensures consistent aiming for both movement and knife throwing
+     * @param {number} clientX - Screen X coordinate
+     * @param {number} clientY - Screen Y coordinate
+     * @returns {THREE.Vector3|null} - World position on aim plane, or null if no intersection
+     */
+    getAimTargetWorldPoint(clientX, clientY) {
+        if (!this.renderer || !this.camera || !this.invisibleGround) {
+            return null;
+        }
+        
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+        const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
+        
+        this.raycaster.setFromCamera({ x: ndcX, y: ndcY }, this.camera);
+        const intersects = this.raycaster.intersectObject(this.invisibleGround);
+        
+        if (intersects.length > 0) {
+            return intersects[0].point.clone();
+        }
+        return null;
+    }
+
     handlePlayerMovement(event) {
         if (this.playerSelf.health <= 0) {
             return;
@@ -1425,7 +1462,19 @@ class MundoKnifeGame3D {
         if (now - this.playerSelf.lastKnifeTime >= this.playerSelf.knifeCooldown) {
             let targetX, targetZ;
             
-            if (this.mouseWorldX !== undefined && this.mouseWorldZ !== undefined) {
+            // Use unified aim calculation for consistent aiming (Issue 2 fix)
+            // This ensures knife throwing uses the same raycast logic as movement
+            if (this.lastMouseClientX !== undefined && this.lastMouseClientY !== undefined) {
+                const aimPoint = this.getAimTargetWorldPoint(this.lastMouseClientX, this.lastMouseClientY);
+                if (aimPoint) {
+                    targetX = aimPoint.x;
+                    targetZ = aimPoint.z;
+                } else {
+                    // Fallback to cached values if raycast fails
+                    targetX = this.mouseWorldX !== undefined ? this.mouseWorldX : this.playerSelf.x + (this.playerSelf.facing * 20);
+                    targetZ = this.mouseWorldZ !== undefined ? this.mouseWorldZ : this.playerSelf.z;
+                }
+            } else if (this.mouseWorldX !== undefined && this.mouseWorldZ !== undefined) {
                 targetX = this.mouseWorldX;
                 targetZ = this.mouseWorldZ;
             } else {
@@ -1616,7 +1665,9 @@ class MundoKnifeGame3D {
             z: dz / (distanceXZ || 1)
         };
         
-        const targetY = 0;
+        // Use groundSurfaceY for consistent aim plane (Issue 2 fix)
+        // This ensures knife trajectory matches the aim plane used for mouse-to-world conversion
+        const targetY = this.groundSurfaceY || 0;
         const dy = targetY - (playerY + spawnHeight);
         
         const direction = new THREE.Vector3(directionXZ.x, dy / (distanceXZ || 1), directionXZ.z);
@@ -2978,14 +3029,60 @@ class MundoKnifeGame3D {
                     // Only correct position for the local player (not teammates in 3v3)
                     // Use playerId check to ensure we only correct our own character
                     if (team === this.myTeam && serverPlayer.playerId === this.myPlayerId) {
-                        // Disabled small position corrections to prevent micro-teleporting/stuttering
-                        // Host movement is client-authoritative for smooth gameplay
-                        // Only correct for very large errors (>2500 sq units = 50 units distance)
-                        // which would indicate a real desync (e.g., respawn, teleport)
+                        // Calculate server's movement state
+                        const serverSpeedSq = (serverPlayer.vx || 0) * (serverPlayer.vx || 0) + 
+                                              (serverPlayer.vz || 0) * (serverPlayer.vz || 0);
+                        const serverIsMoving = !!serverPlayer.isMoving || serverSpeedSq > 0.0001;
+                        
+                        // Debug: Track stop timing transitions
+                        if (this.DEBUG_STOP) {
+                            if (this._debugStop.lastServerIsMoving && !serverIsMoving) {
+                                // Server just stopped
+                                this._debugStop.serverStopTime = now;
+                                console.log(`[STOP-DEBUG] Server stopped at ${now}`);
+                            }
+                            this._debugStop.lastServerIsMoving = serverIsMoving;
+                        }
+                        
                         const dx = this.playerSelf.x - serverPlayer.x;
                         const dz = this.playerSelf.z - serverPlayer.z;
                         const positionErrorSq = dx * dx + dz * dz;
+                        const positionError = Math.sqrt(positionErrorSq);
                         
+                        // AUTHORITATIVE STOP LOGIC (Issue 1 fix)
+                        // When server says we're stopped, immediately stop the client
+                        // This prevents the 0.2-0.4s sliding delay
+                        if (!serverIsMoving) {
+                            // Kill local movement intent
+                            this.playerSelf.isMoving = false;
+                            this.playerSelf.targetX = null;
+                            this.playerSelf.targetZ = null;
+                            
+                            // Position correction based on error magnitude
+                            if (positionError <= 0.1) {
+                                // Very close - hard snap (imperceptible)
+                                this.playerSelf.x = serverPlayer.x;
+                                this.playerSelf.z = serverPlayer.z;
+                            } else if (positionError <= 2.0) {
+                                // Small error - one-time stronger correction
+                                this.playerSelf.x = serverPlayer.x;
+                                this.playerSelf.z = serverPlayer.z;
+                                if (this.DEBUG_STOP) {
+                                    console.log(`[STOP-DEBUG] Applied stop correction: ${positionError.toFixed(3)} units`);
+                                }
+                            }
+                            // For errors > 2.0 but <= 50, let the existing large error check handle it
+                            
+                            // Debug: Record client stop time
+                            if (this.DEBUG_STOP && this._debugStop.serverStopTime > 0) {
+                                this._debugStop.clientStopTime = now;
+                                const stopDelta = this._debugStop.clientStopTime - this._debugStop.serverStopTime;
+                                console.log(`[STOP-DEBUG] Client stopped at ${now}, delta: ${stopDelta}ms`);
+                                this._debugStop.serverStopTime = 0; // Reset for next measurement
+                            }
+                        }
+                        
+                        // Large error correction (>50 units) - indicates real desync (respawn, teleport)
                         if (positionErrorSq > 2500) {
                             this.playerSelf.x = serverPlayer.x;
                             this.playerSelf.z = serverPlayer.z;
