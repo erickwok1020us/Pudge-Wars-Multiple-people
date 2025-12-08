@@ -1787,7 +1787,17 @@ class MundoKnifeGame3D {
             ownerIsLocal: ownerTeam === this.myTeam
         };
         
-        console.log('[KNIFE] Created knife from server data - team:', ownerTeam, 'pos:', serverX.toFixed(2), serverZ.toFixed(2), 'vel:', velocityX.toFixed(3), velocityZ.toFixed(3));
+        // DEBUG: Log detailed knife creation info to diagnose health desync
+        console.log('[KNIFE][REMOTE-SPAWN]', {
+            ownerTeam,
+            ownerTeamType: typeof ownerTeam,
+            myTeam: this.myTeam,
+            opponentTeam: this.opponentTeam,
+            throwerTeam: thrower ? thrower.team : 'null',
+            throwerExists: !!thrower,
+            pos: { x: serverX.toFixed(2), z: serverZ.toFixed(2) },
+            vel: { x: velocityX.toFixed(3), z: velocityZ.toFixed(3) }
+        });
         
         this.knives.push(knifeData);
         this.scene.add(knifeGroup);
@@ -2332,6 +2342,22 @@ class MundoKnifeGame3D {
         const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.myTeam;
         const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.opponentTeam;
         
+        // DEBUG: Log knife classification to diagnose health desync
+        if (this.isMultiplayer && !knife._classificationLogged) {
+            console.log('[KNIFE][CLASSIFICATION]', {
+                knifeIndex,
+                hasThrower: !!knife.thrower,
+                throwerTeam: knife.thrower ? knife.thrower.team : 'null',
+                throwerTeamType: knife.thrower ? typeof knife.thrower.team : 'N/A',
+                myTeam: this.myTeam,
+                opponentTeam: this.opponentTeam,
+                isLocalPlayerKnife,
+                isOpponentKnife,
+                willSkip: this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife
+            });
+            knife._classificationLogged = true;
+        }
+        
         if (this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife) {
             return;
         }
@@ -2700,6 +2726,19 @@ class MundoKnifeGame3D {
             instructions.style.display = 'block';
         }
         
+        // Reset health to full at game start to fix intermittent 4/5 health bug
+        this.playerSelf.health = this.playerSelf.maxHealth;
+        if (this.playerOpponent) {
+            this.playerOpponent.health = this.playerOpponent.maxHealth;
+        }
+        // Also reset all team players' health (for 3v3 mode)
+        [...this.team1, ...this.team2].forEach(player => {
+            player.health = player.maxHealth;
+            player.isDead = false;
+        });
+        this.updateHealthDisplay();
+        console.log('[GAME-START] Reset all players health to full');
+        
         this.playerSelf.knifeCooldown = 4000;
         if (this.playerOpponent) {
             this.playerOpponent.knifeCooldown = 4000;
@@ -2817,6 +2856,21 @@ class MundoKnifeGame3D {
 
     applyServerHealthUpdate(data) {
         console.log(`[SERVER-HEALTH] Applying authoritative update - targetPlayerId:${data.targetPlayerId} targetTeam:${data.targetTeam} health:${data.health} isDead:${data.isDead}`);
+        
+        // DEBUG: Log detailed type information to diagnose health desync
+        console.log('[SERVER-HEALTH][DEBUG]', {
+            targetPlayerId: data.targetPlayerId,
+            targetTeam: data.targetTeam,
+            targetTeamType: typeof data.targetTeam,
+            myTeam: this.myTeam,
+            myTeamType: typeof this.myTeam,
+            opponentTeam: this.opponentTeam,
+            opponentTeamType: typeof this.opponentTeam,
+            isHost: this.isHost,
+            playersByIdKeys: Array.from(this.playersById.keys()),
+            playerSelfHealth: this.playerSelf ? this.playerSelf.health : 'N/A',
+            playerOpponentHealth: this.playerOpponent ? this.playerOpponent.health : 'N/A'
+        });
         
         const clampedHealth = Math.max(0, Math.min(data.health, 5));
         this.lastHealthByTeam[data.targetTeam] = clampedHealth;
@@ -3112,6 +3166,10 @@ class MundoKnifeGame3D {
                             
                             // Update health
                             if (serverPlayer.health !== undefined) {
+                                // DEBUG: Track health changes to diagnose initial health bug
+                                if (localPlayer.health !== serverPlayer.health) {
+                                    console.log(`[HEALTH-CHANGE] Player ${serverPlayer.playerId} health: ${localPlayer.health} -> ${serverPlayer.health} (from serverGameState)`);
+                                }
                                 localPlayer.health = serverPlayer.health;
                             }
                         }
