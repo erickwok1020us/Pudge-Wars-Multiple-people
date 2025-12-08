@@ -1706,6 +1706,95 @@ class MundoKnifeGame3D {
         return knifeData;
     }
 
+    /**
+     * Create knife directly from server data (position and velocity)
+     * This ensures remote knives use exact server position, not interpolated opponent position
+     * Fixes guest knife aiming inaccuracy issue
+     */
+    createKnifeFromServerData(serverX, serverZ, velocityX, velocityZ, ownerTeam, audio = null) {
+        const knifeGroup = new THREE.Group();
+        
+        const bladeGeometry = new THREE.BoxGeometry(0.3, 6, 1.2);
+        const bladeMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0xC0C0C0,
+            emissive: 0x888888,
+            emissiveIntensity: 0.5
+        });
+        const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+        blade.position.set(0, 2, 0);
+        
+        const handleGeometry = new THREE.BoxGeometry(0.4, 2.5, 0.8);
+        const handleMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x4A4A4A,
+            emissive: 0x2A2A2A,
+            emissiveIntensity: 0.3
+        });
+        const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+        handle.position.set(0, -1.5, 0);
+        
+        const guardGeometry = new THREE.BoxGeometry(0.5, 0.3, 1.5);
+        const guardMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x696969,
+            emissive: 0x333333,
+            emissiveIntensity: 0.4
+        });
+        const guard = new THREE.Mesh(guardGeometry, guardMaterial);
+        guard.position.set(0, 0.2, 0);
+        
+        knifeGroup.add(blade);
+        knifeGroup.add(handle);
+        knifeGroup.add(guard);
+        
+        // Use server position directly
+        const spawnHeight = this.knifeSpawnHeight || this.characterSize;
+        knifeGroup.position.set(serverX, spawnHeight, serverZ);
+        knifeGroup.castShadow = true;
+        
+        // Calculate direction from velocity (already normalized by server)
+        const speed = Math.sqrt(velocityX * velocityX + velocityZ * velocityZ);
+        const dirX = speed > 0 ? velocityX / speed : 1;
+        const dirZ = speed > 0 ? velocityZ / speed : 0;
+        
+        // Use groundSurfaceY for consistent aim plane
+        const targetY = this.groundSurfaceY || 0;
+        const dy = targetY - spawnHeight;
+        const distanceXZ = speed > 0 ? speed : 1;
+        
+        const direction = new THREE.Vector3(dirX, dy / distanceXZ, dirZ);
+        
+        knifeGroup.lookAt(
+            knifeGroup.position.x + direction.x,
+            knifeGroup.position.y + direction.y,
+            knifeGroup.position.z + direction.z
+        );
+        
+        // Convert server velocity to client velocity (server uses different speed constant)
+        // Server KNIFE_SPEED = 275 units/sec at 60 ticks = 4.5833 units/tick
+        // Client knifeSpeed = 4.5864 units/frame
+        const knifeSpeed = 4.5864;
+        
+        // Find the thrower player for reference
+        const thrower = ownerTeam === this.opponentTeam ? this.playerOpponent : 
+                       (ownerTeam === this.myTeam ? this.playerSelf : null);
+        
+        const knifeData = {
+            mesh: knifeGroup,
+            vx: dirX * knifeSpeed,
+            vz: dirZ * knifeSpeed,
+            fromPlayer: ownerTeam === 1 ? 1 : 2,
+            thrower: thrower,
+            audio: audio,
+            ownerIsLocal: ownerTeam === this.myTeam
+        };
+        
+        console.log('[KNIFE] Created knife from server data - team:', ownerTeam, 'pos:', serverX.toFixed(2), serverZ.toFixed(2), 'vel:', velocityX.toFixed(3), velocityZ.toFixed(3));
+        
+        this.knives.push(knifeData);
+        this.scene.add(knifeGroup);
+        
+        return knifeData;
+    }
+
     createKnife3D(fromPlayer, toPlayer) {
         const knifeGroup = new THREE.Group();
         
@@ -2823,21 +2912,25 @@ class MundoKnifeGame3D {
             
             if (data.ownerTeam !== this.myTeam) {
                 console.log('[KNIFE][SPAWN-REMOTE]', data);
-                const thrower = data.ownerTeam === this.opponentTeam ? this.playerOpponent : null;
-                if (thrower) {
-                    const targetX = data.x + data.velocityX * 10;
-                    const targetZ = data.z + data.velocityZ * 10;
-                    
-                    const knifeAudio = new Audio('knife-slice-41231.mp3');
-                    knifeAudio.volume = 0.4;
-                    knifeAudio.play().catch(e => {});
-                    
-                    const knife = this.createKnife3DTowards(thrower, targetX, targetZ, null, knifeAudio);
-                    if (knife) {
-                        knife.knifeId = data.knifeId;
-                        knife.serverConfirmed = true;
-                        console.log('[KNIFE][SPAWN-REMOTE-CREATED]', { knifeId: data.knifeId, idx: this.knives.indexOf(knife) });
-                    }
+                
+                const knifeAudio = new Audio('knife-slice-41231.mp3');
+                knifeAudio.volume = 0.4;
+                knifeAudio.play().catch(e => {});
+                
+                // Use server position and velocity directly to fix guest knife aiming inaccuracy
+                // Previously used interpolated playerOpponent position which caused direction mismatch
+                const knife = this.createKnifeFromServerData(
+                    data.x, 
+                    data.z, 
+                    data.velocityX, 
+                    data.velocityZ, 
+                    data.ownerTeam, 
+                    knifeAudio
+                );
+                if (knife) {
+                    knife.knifeId = data.knifeId;
+                    knife.serverConfirmed = true;
+                    console.log('[KNIFE][SPAWN-REMOTE-CREATED]', { knifeId: data.knifeId, idx: this.knives.indexOf(knife) });
                 }
             }
         });
