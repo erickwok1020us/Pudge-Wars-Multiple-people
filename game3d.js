@@ -1787,7 +1787,17 @@ class MundoKnifeGame3D {
             ownerIsLocal: ownerTeam === this.myTeam
         };
         
-        console.log('[KNIFE] Created knife from server data - team:', ownerTeam, 'pos:', serverX.toFixed(2), serverZ.toFixed(2), 'vel:', velocityX.toFixed(3), velocityZ.toFixed(3));
+        // DEBUG: Log detailed knife creation info to diagnose health desync
+        console.log('[KNIFE][REMOTE-SPAWN]', {
+            ownerTeam,
+            ownerTeamType: typeof ownerTeam,
+            myTeam: this.myTeam,
+            opponentTeam: this.opponentTeam,
+            throwerTeam: thrower ? thrower.team : 'null',
+            throwerExists: !!thrower,
+            pos: { x: serverX.toFixed(2), z: serverZ.toFixed(2) },
+            vel: { x: velocityX.toFixed(3), z: velocityZ.toFixed(3) }
+        });
         
         this.knives.push(knifeData);
         this.scene.add(knifeGroup);
@@ -2332,6 +2342,22 @@ class MundoKnifeGame3D {
         const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.myTeam;
         const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.opponentTeam;
         
+        // DEBUG: Log knife classification to diagnose health desync
+        if (this.isMultiplayer && !knife._classificationLogged) {
+            console.log('[KNIFE][CLASSIFICATION]', {
+                knifeIndex,
+                hasThrower: !!knife.thrower,
+                throwerTeam: knife.thrower ? knife.thrower.team : 'null',
+                throwerTeamType: knife.thrower ? typeof knife.thrower.team : 'N/A',
+                myTeam: this.myTeam,
+                opponentTeam: this.opponentTeam,
+                isLocalPlayerKnife,
+                isOpponentKnife,
+                willSkip: this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife
+            });
+            knife._classificationLogged = true;
+        }
+        
         if (this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife) {
             return;
         }
@@ -2817,6 +2843,21 @@ class MundoKnifeGame3D {
 
     applyServerHealthUpdate(data) {
         console.log(`[SERVER-HEALTH] Applying authoritative update - targetPlayerId:${data.targetPlayerId} targetTeam:${data.targetTeam} health:${data.health} isDead:${data.isDead}`);
+        
+        // DEBUG: Log detailed type information to diagnose health desync
+        console.log('[SERVER-HEALTH][DEBUG]', {
+            targetPlayerId: data.targetPlayerId,
+            targetTeam: data.targetTeam,
+            targetTeamType: typeof data.targetTeam,
+            myTeam: this.myTeam,
+            myTeamType: typeof this.myTeam,
+            opponentTeam: this.opponentTeam,
+            opponentTeamType: typeof this.opponentTeam,
+            isHost: this.isHost,
+            playersByIdKeys: Array.from(this.playersById.keys()),
+            playerSelfHealth: this.playerSelf ? this.playerSelf.health : 'N/A',
+            playerOpponentHealth: this.playerOpponent ? this.playerOpponent.health : 'N/A'
+        });
         
         const clampedHealth = Math.max(0, Math.min(data.health, 5));
         this.lastHealthByTeam[data.targetTeam] = clampedHealth;
