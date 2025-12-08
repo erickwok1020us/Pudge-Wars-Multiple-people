@@ -211,7 +211,10 @@ class MundoKnifeGame3D {
         this.opponentSnapshots = [];
         this.snapshotLimit = 32; // Increased from 10 for better buffering
         
-        this.baseInterpolationDelay = 80; // Base delay in ms (increased for smoother interpolation)
+        // Per-player snapshot buffers for 3v3 mode (keyed by playerId)
+        this.remotePlayerSnapshots = new Map();
+        
+        this.baseInterpolationDelay = 80;// Base delay in ms (increased for smoother interpolation)
         this.interpolationDelay = 80;
         this.minInterpolationDelay = 60;
         this.maxInterpolationDelay = 150;
@@ -1941,6 +1944,79 @@ class MundoKnifeGame3D {
             this.playerOpponent.mesh.rotation.y = this.playerOpponent.rotation;
         }
     }
+    
+    // Interpolate a single remote player using their snapshot buffer (for 3v3 mode)
+    interpolateRemotePlayer(player, snapshots, serverNow, renderTime) {
+        if (!snapshots || snapshots.length < 2) return;
+        
+        // Find two snapshots to interpolate between
+        let snapshot0 = null;
+        let snapshot1 = null;
+        
+        for (let i = 0; i < snapshots.length - 1; i++) {
+            if (snapshots[i].timestamp <= renderTime && snapshots[i + 1].timestamp >= renderTime) {
+                snapshot0 = snapshots[i];
+                snapshot1 = snapshots[i + 1];
+                break;
+            }
+        }
+        
+        let finalX, finalZ;
+        
+        if (snapshot0 && snapshot1) {
+            // Normal interpolation between two snapshots
+            const t = (renderTime - snapshot0.timestamp) / (snapshot1.timestamp - snapshot0.timestamp);
+            finalX = snapshot0.x + (snapshot1.x - snapshot0.x) * t;
+            finalZ = snapshot0.z + (snapshot1.z - snapshot0.z) * t;
+            player.isMoving = snapshot1.isMoving;
+        } else if (snapshots.length > 0) {
+            // Extrapolation: use latest snapshot and velocity
+            const latest = snapshots[snapshots.length - 1];
+            const timeSinceLatest = (serverNow - latest.timestamp) / 1000;
+            
+            if (timeSinceLatest < 0.5 && latest.isMoving) {
+                // Extrapolate based on velocity
+                const vx = latest.vx || 0;
+                const vz = latest.vz || 0;
+                finalX = latest.x + vx * timeSinceLatest;
+                finalZ = latest.z + vz * timeSinceLatest;
+            } else {
+                // Too old or not moving, just use latest position
+                finalX = latest.x;
+                finalZ = latest.z;
+            }
+            player.isMoving = latest.isMoving;
+        } else {
+            return; // No snapshots available
+        }
+        
+        // Update player position
+        player.x = finalX;
+        player.z = finalZ;
+        
+        if (player.mesh) {
+            player.mesh.position.x = finalX;
+            player.mesh.position.z = finalZ;
+            player.mesh.rotation.y = player.rotation;
+        }
+    }
+    
+    // Interpolate all remote players for 3v3 mode (teammates + opponents = 5 players)
+    interpolateAllRemotePlayers() {
+        const serverNow = Date.now() - this.serverTimeOffset;
+        const renderTime = serverNow - this.interpolationDelay;
+        
+        for (const [playerId, player] of this.playersById.entries()) {
+            // Skip self - only interpolate remote players
+            if (player === this.playerSelf) continue;
+            
+            // Interpolate ALL remote players (both teammates and opponents)
+            const snapshots = this.remotePlayerSnapshots.get(playerId);
+            if (!snapshots || snapshots.length < 2) continue;
+            
+            this.interpolateRemotePlayer(player, snapshots, serverNow, renderTime);
+        }
+    }
 
     updateKnives(dt) {
         for (let i = this.knives.length - 1; i >= 0; i--) {
@@ -2733,11 +2809,59 @@ class MundoKnifeGame3D {
             if (data.players && data.players.length > 0) {
                 data.players.forEach(serverPlayer => {
                     const team = Number(serverPlayer.team);
+                    const playerId = serverPlayer.playerId;
                     
                     if (this.debugSync && team === this.opponentTeam) {
                         console.log(`[SYNC-DEBUG] Received opponent data - team:${team}, x:${serverPlayer.x.toFixed(2)}, z:${serverPlayer.z.toFixed(2)}, serverTime:${data.serverTime}`);
                     }
                     
+                    // For 3v3 mode: register remote players in playersById and store snapshots
+                    if (this.gameMode === '3v3' && playerId && playerId !== this.myPlayerId) {
+                        // Find the local player object for this remote player
+                        let localPlayer = this.playersById.get(playerId);
+                        
+                        if (!localPlayer) {
+                            // Find matching player in team arrays by team and playerIndex
+                            const teamArray = team === 1 ? this.team1 : this.team2;
+                            const playerIndex = serverPlayer.playerIndex !== undefined ? serverPlayer.playerIndex : 0;
+                            localPlayer = teamArray[playerIndex];
+                            
+                            if (localPlayer) {
+                                localPlayer.playerId = playerId;
+                                this.playersById.set(playerId, localPlayer);
+                                console.log(`[3V3-INTERP] Registered remote player ${playerId} (team ${team}, index ${playerIndex})`);
+                            }
+                        }
+                        
+                        // Store snapshot for interpolation
+                        if (localPlayer) {
+                            let playerBuffer = this.remotePlayerSnapshots.get(playerId);
+                            if (!playerBuffer) {
+                                playerBuffer = [];
+                                this.remotePlayerSnapshots.set(playerId, playerBuffer);
+                            }
+                            playerBuffer.push({
+                                timestamp: data.serverTime,
+                                x: serverPlayer.x,
+                                z: serverPlayer.z,
+                                targetX: serverPlayer.targetX,
+                                targetZ: serverPlayer.targetZ,
+                                isMoving: serverPlayer.isMoving,
+                                vx: serverPlayer.vx || 0,
+                                vz: serverPlayer.vz || 0
+                            });
+                            if (playerBuffer.length > this.snapshotLimit) {
+                                playerBuffer.shift();
+                            }
+                            
+                            // Update health
+                            if (serverPlayer.health !== undefined) {
+                                localPlayer.health = serverPlayer.health;
+                            }
+                        }
+                    }
+                    
+                    // Legacy 1v1 mode handling
                     if (serverPlayer.playerId) {
                         const localPlayer = this.playersById.get(serverPlayer.playerId);
                         if (localPlayer && serverPlayer.health !== undefined) {
@@ -2758,7 +2882,7 @@ class MundoKnifeGame3D {
                             this.playerSelf.x = serverPlayer.x;
                             this.playerSelf.z = serverPlayer.z;
                         }
-                    }else if (team === this.opponentTeam) {
+                    } else if (this.gameMode !== '3v3' && team === this.opponentTeam) {
                         const now = Date.now();
                         
                         const rawOffset = now - data.serverTime;
@@ -2902,8 +3026,15 @@ class MundoKnifeGame3D {
         });
         
         if (this.gameState.isRunning || this.gameState.countdownActive) {
-            if (this.isMultiplayer && this.playerOpponent) {
-                this.interpolateOpponentPosition();
+            if (this.isMultiplayer) {
+                // Use different interpolation paths based on game mode
+                if (this.gameMode === '3v3') {
+                    // 3v3 mode: interpolate all remote players using per-player buffers
+                    this.interpolateAllRemotePlayers();
+                } else if (this.playerOpponent) {
+                    // 1v1 mode: use single opponent interpolation (backward compatible)
+                    this.interpolateOpponentPosition();
+                }
             }
             
             [...this.team1, ...this.team2].forEach(player => {
