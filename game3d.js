@@ -2726,6 +2726,19 @@ class MundoKnifeGame3D {
             instructions.style.display = 'block';
         }
         
+        // Reset health to full at game start to fix intermittent 4/5 health bug
+        this.playerSelf.health = this.playerSelf.maxHealth;
+        if (this.playerOpponent) {
+            this.playerOpponent.health = this.playerOpponent.maxHealth;
+        }
+        // Also reset all team players' health (for 3v3 mode)
+        [...this.team1, ...this.team2].forEach(player => {
+            player.health = player.maxHealth;
+            player.isDead = false;
+        });
+        this.updateHealthDisplay();
+        console.log('[GAME-START] Reset all players health to full');
+        
         this.playerSelf.knifeCooldown = 4000;
         if (this.playerOpponent) {
             this.playerOpponent.knifeCooldown = 4000;
