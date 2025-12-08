@@ -208,16 +208,25 @@ class MundoKnifeGame3D {
         this.lastHealthByTeam = {};
         this.lastMoveInputTime = 0;
         
+        // Feature flag: 3v3 mode uses optimized network settings
+        // 1v1 mode keeps original stable settings
+        this.is3v3Mode = practiceMode === '3v3';
+        
         this.opponentSnapshots = [];
         this.snapshotLimit = 32; // Increased from 10 for better buffering
         
         // Per-player snapshot buffers for 3v3 mode (keyed by playerId)
         this.remotePlayerSnapshots = new Map();
         
-        this.baseInterpolationDelay = 80;// Base delay in ms (increased for smoother interpolation)
-        this.interpolationDelay = 80;
-        this.minInterpolationDelay = 60;
-        this.maxInterpolationDelay = 150;
+        // Interpolation delay settings (mode-specific)
+        // 3v3: Lower delay for tighter sync (60ms base, 50-100ms range)
+        // 1v1: Original settings (80ms base, 60-150ms range)
+        this.baseInterpolationDelay = this.is3v3Mode ? 60 : 80;
+        this.interpolationDelay = this.is3v3Mode ? 60 : 80;
+        this.minInterpolationDelay = this.is3v3Mode ? 50 : 60;
+        this.maxInterpolationDelay = this.is3v3Mode ? 100 : 150;
+        
+        console.log(`[NETCODE] Mode: ${practiceMode}, is3v3Mode: ${this.is3v3Mode}, interpolationDelay: ${this.interpolationDelay}ms`);
         
         this.networkStats = {
             lastUpdateTimes: [],
