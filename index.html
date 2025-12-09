@@ -510,7 +510,7 @@
 
         .room-content {
             background: var(--card-bg);
-            padding: 10px 10px 60px 10px;
+            padding: 10px 10px 40px 10px;
             border-radius: var(--border-radius);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -518,10 +518,12 @@
             max-width: 600px;
             width: 90%;
             position: fixed;
-            top: 55%;
+            top: 40%;
             z-index: 20;
             left: 50%;
             transform: translateX(-50%);
+            max-height: 85vh;
+            overflow-y: auto;
         }
 
         .room-code {
