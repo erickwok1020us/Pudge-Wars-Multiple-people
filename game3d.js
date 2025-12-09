@@ -208,6 +208,11 @@ class MundoKnifeGame3D {
         this.lastHealthByTeam = {};
         this.lastMoveInputTime = 0;
         
+        // LoL-style hit prediction tracking
+        // Stores predicted hits waiting for server confirmation
+        // key: knifeId, value: { targetTeam, predictedAt, hitPos, confirmed }
+        this.pendingHits = new Map();
+        
         // Feature flag: 3v3 mode uses optimized network settings
         // 1v1 mode keeps original stable settings
         this.is3v3Mode = practiceMode === '3v3';
@@ -2342,22 +2347,6 @@ class MundoKnifeGame3D {
         const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.myTeam;
         const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.opponentTeam;
         
-        // DEBUG: Log knife classification to diagnose health desync
-        if (this.isMultiplayer && !knife._classificationLogged) {
-            console.log('[KNIFE][CLASSIFICATION]', {
-                knifeIndex,
-                hasThrower: !!knife.thrower,
-                throwerTeam: knife.thrower ? knife.thrower.team : 'null',
-                throwerTeamType: knife.thrower ? typeof knife.thrower.team : 'N/A',
-                myTeam: this.myTeam,
-                opponentTeam: this.opponentTeam,
-                isLocalPlayerKnife,
-                isOpponentKnife,
-                willSkip: this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife
-            });
-            knife._classificationLogged = true;
-        }
-        
         if (this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife) {
             return;
         }
@@ -2394,45 +2383,61 @@ class MundoKnifeGame3D {
                 Math.pow(knifeWorldPos.z - targetWorldPos.z, 2)
             );
             
-            const threshold = this.characterSize * 1.05;
-            
-            if (isOpponentKnife && target === this.playerSelf) {
-                console.log('[KNIFE][PREDICT-DEBUG]', {
-                    role: this.isHostPlayer ? 'HOST' : 'JOINER',
-                    myTeam: this.myTeam,
-                    opponentTeam: this.opponentTeam,
-                    throwerTeam: thrower.team,
-                    targetTeam: target.team,
-                    distance: distance.toFixed(2),
-                    threshold: threshold.toFixed(2),
-                    willHit: distance < threshold,
-                    knifePos: { x: knifeWorldPos.x.toFixed(2), z: knifeWorldPos.z.toFixed(2) },
-                    targetPos: { x: targetWorldPos.x.toFixed(2), z: targetWorldPos.z.toFixed(2) }
-                });
-            }
+            // Use slightly conservative threshold for prediction to reduce false positives
+            // Server uses COLLISION_RADIUS = 11.025, we use 95% of that for prediction
+            const threshold = this.characterSize * 1.0;
             
             if (distance < threshold) {
-                console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit ${isOpponentKnife ? 'self' : 'opponent'}! (multiplayer: ${this.isMultiplayer})`);
-                
-                this.createBloodEffect(targetWorldPos.x, targetWorldPos.y, targetWorldPos.z);
-                
-                const hitSound = document.getElementById('hitSound');
-                if (hitSound) {
-                    hitSound.currentTime = 0;
-                    hitSound.play().catch(e => {});
-                }
-                
-                knife.hasHit = true;
+                // LoL-STYLE PREDICTION: Immediate visual feedback, server validates
                 
                 if (this.isMultiplayer) {
+                    // Check if we already predicted this hit
+                    if (knife.predictedHit || this.pendingHits.has(knife.knifeId)) {
+                        return;
+                    }
+                    
+                    console.log(`💥 [HIT-PREDICT] Knife ${knife.knifeId} from Team${thrower.team} predicted hit on ${isOpponentKnife ? 'self' : 'opponent'}`);
+                    
+                    // Store pending hit for server confirmation
+                    this.pendingHits.set(knife.knifeId, {
+                        targetTeam: target.team,
+                        predictedAt: Date.now(),
+                        hitPos: { x: targetWorldPos.x, y: targetWorldPos.y, z: targetWorldPos.z },
+                        confirmed: false
+                    });
+                    
+                    // Immediate visual feedback (VFX only - no health changes!)
+                    this.createBloodEffect(targetWorldPos.x, targetWorldPos.y, targetWorldPos.z);
+                    
+                    const hitSound = document.getElementById('hitSound');
+                    if (hitSound) {
+                        hitSound.currentTime = 0;
+                        hitSound.play().catch(e => {});
+                    }
+                    
+                    // Mark knife as predicted hit (hide but don't dispose - server will confirm)
+                    knife.hasHit = true;
                     knife.mesh.visible = false;
                     knife.predictedHit = true;
                     
-                    if (isLocalPlayerKnife && target === this.playerOpponent && target.health > 0) {
-                        target.health = Math.max(0, target.health - 1);
-                        this.updateHealthDisplay();
-                    }
+                    // NOTE: Health is NOT changed here!
+                    // Health changes only come from serverHealthUpdate via applyServerHealthUpdate()
+                    // This ensures server-authoritative health even with client-side prediction
+                    
                 } else {
+                    // SINGLE-PLAYER / AI MODE: Client is authoritative
+                    console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit opponent! (AI mode)`);
+                    
+                    this.createBloodEffect(targetWorldPos.x, targetWorldPos.y, targetWorldPos.z);
+                    
+                    const hitSound = document.getElementById('hitSound');
+                    if (hitSound) {
+                        hitSound.currentTime = 0;
+                        hitSound.play().catch(e => {});
+                    }
+                    
+                    knife.hasHit = true;
+                    
                     this.disposeKnife(knife);
                     this.knives.splice(knifeIndex, 1);
                     
@@ -3015,10 +3020,17 @@ class MundoKnifeGame3D {
             
             const knife = this.knives.find(k => k.knifeId === data.knifeId);
             
-            // Check if this hit was already predicted by the local player
-            // If so, skip duplicate blood/sound effects
-            const isLocalOwner = knife && knife.thrower && knife.thrower.team === this.myTeam;
+            // LoL-STYLE: Check if this hit was already predicted
+            // If predicted, mark as confirmed and skip duplicate VFX
+            const pendingHit = this.pendingHits.get(data.knifeId);
             const alreadyPredicted = knife && knife.predictedHit;
+            
+            if (pendingHit) {
+                // Server confirmed our prediction - mark as confirmed
+                pendingHit.confirmed = true;
+                this.pendingHits.delete(data.knifeId);
+                console.log(`[HIT-CONFIRM] Server confirmed predicted hit for knife ${data.knifeId}`);
+            }
             
             if (!alreadyPredicted) {
                 // Only play blood/sound if this client did NOT already predict this hit
@@ -3029,6 +3041,8 @@ class MundoKnifeGame3D {
                     hitSound.currentTime = 0;
                     hitSound.play().catch(e => {});
                 }
+            } else {
+                console.log(`[HIT-SKIP-VFX] Skipping duplicate VFX for predicted hit knife ${data.knifeId}`);
             }
             
             if (knife) {
@@ -3066,6 +3080,16 @@ class MundoKnifeGame3D {
         });
         
         socket.on('serverKnifeDestroy', (data) => {
+            // LoL-STYLE: Check if we had a pending prediction for this knife
+            // If knife was destroyed without serverKnifeHit, our prediction was WRONG (miss)
+            const pendingHit = this.pendingHits.get(data.knifeId);
+            if (pendingHit && !pendingHit.confirmed) {
+                // Our prediction was wrong - server says this knife missed
+                // No health rollback needed since we never changed health locally
+                // The blood/sound already played is acceptable (feels responsive)
+                console.log(`[HIT-MISS] Server says knife ${data.knifeId} missed (we predicted hit)`);
+                this.pendingHits.delete(data.knifeId);
+            }
             
             const knife = this.knives.find(k => k.knifeId === data.knifeId);
             if (knife) {
@@ -3403,6 +3427,20 @@ class MundoKnifeGame3D {
         
         this.updateCooldownDisplay();
         this.updateHealthDisplay();
+        
+        // LoL-STYLE: Clean up stale pending hits (safety cleanup)
+        // If a pending hit hasn't been confirmed/rejected within timeout, remove it
+        if (this.isMultiplayer && this.pendingHits.size > 0) {
+            const now = Date.now();
+            const timeoutMs = Math.max(500, (this.latencyData?.currentLatency || 100) * 3);
+            for (const [knifeId, pendingHit] of this.pendingHits) {
+                if (now - pendingHit.predictedAt > timeoutMs) {
+                    console.log(`[HIT-CLEANUP] Removing stale pending hit for knife ${knifeId} (age: ${now - pendingHit.predictedAt}ms)`);
+                    this.pendingHits.delete(knifeId);
+                }
+            }
+        }
+        
         this.renderer.render(this.scene, this.camera);
         
         this.fpsData.frames++;
