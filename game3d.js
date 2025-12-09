@@ -2254,35 +2254,29 @@ class MundoKnifeGame3D {
             
             if (knife.hasHit) continue;
             
+            // Update knife position and rotation
             knife.mesh.position.x += knife.vx;
             knife.mesh.position.y += (knife.vy || 0);
             knife.mesh.position.z += knife.vz;
             knife.mesh.rotation.z += 0.3;
             
-            const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.myTeam;
-            const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.opponentTeam;
-            
-            if (isOpponentKnife) {
-                console.log('[KNIFE][CLASSIFY]', {
-                    role: this.isHostPlayer ? 'HOST' : 'JOINER',
-                    myTeam: this.myTeam,
-                    opponentTeam: this.opponentTeam,
-                    throwerTeam: knife.thrower.team,
-                    isLocalPlayerKnife,
-                    isOpponentKnife,
-                    knifeId: knife.knifeId
-                });
-            }
-            
-            if (isLocalPlayerKnife || isOpponentKnife) {
-                this.checkKnifeCollisions(knife, i);
-                if (knife.hasHit) continue;
-            }
-            
-            if (this.isMultiplayer && knife.serverConfirmed) {
+            // MULTIPLAYER: Server handles all collision detection
+            // Knives are disposed via serverKnifeHit or serverKnifeDestroy events
+            if (this.isMultiplayer) {
+                // Only dispose knives that go way out of bounds (safety cleanup)
+                // Normal disposal is handled by server events
+                if (Math.abs(knife.mesh.position.x) > 200 ||
+                    Math.abs(knife.mesh.position.z) > 200 ||
+                    knife.mesh.position.y < -50 || 
+                    knife.mesh.position.y > 200) {
+                    console.log('[KNIFE][CLEANUP] Disposing out-of-bounds knife in multiplayer', knife.knifeId);
+                    this.disposeKnife(knife);
+                    this.knives.splice(i, 1);
+                }
                 continue;
             }
             
+            // SINGLE-PLAYER / AI MODE: Client handles collision detection
             if (Math.abs(knife.mesh.position.x) > 120 ||
                 Math.abs(knife.mesh.position.z) > 90 ||
                 knife.mesh.position.y < -20 || 
@@ -2339,45 +2333,20 @@ class MundoKnifeGame3D {
     }
 
     checkKnifeCollisions(knife, knifeIndex) {
-        const isLocalPlayerKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.myTeam;
-        const isOpponentKnife = this.isMultiplayer && knife.thrower && knife.thrower.team === this.opponentTeam;
-        
-        // DEBUG: Log knife classification to diagnose health desync
-        if (this.isMultiplayer && !knife._classificationLogged) {
-            console.log('[KNIFE][CLASSIFICATION]', {
-                knifeIndex,
-                hasThrower: !!knife.thrower,
-                throwerTeam: knife.thrower ? knife.thrower.team : 'null',
-                throwerTeamType: knife.thrower ? typeof knife.thrower.team : 'N/A',
-                myTeam: this.myTeam,
-                opponentTeam: this.opponentTeam,
-                isLocalPlayerKnife,
-                isOpponentKnife,
-                willSkip: this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife
-            });
-            knife._classificationLogged = true;
-        }
-        
-        if (this.isMultiplayer && !isLocalPlayerKnife && !isOpponentKnife) {
+        // MULTIPLAYER: Skip client-side collision detection entirely
+        // All hit detection is now server-authoritative via serverKnifeHit event
+        // This prevents desync issues at map edges where client and server positions differ
+        if (this.isMultiplayer) {
             return;
         }
         
+        // SINGLE-PLAYER / AI MODE: Client-side collision detection (unchanged)
         const knifeWorldPos = new THREE.Vector3();
         knife.mesh.getWorldPosition(knifeWorldPos);
         
         const thrower = knife.thrower;
-        
-        let targets = [];
-        if (this.isMultiplayer) {
-            if (isLocalPlayerKnife) {
-                targets = [this.playerOpponent];
-            } else if (isOpponentKnife) {
-                targets = [this.playerSelf];
-            }
-        } else {
-            const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
-            targets = targetTeam;
-        }
+        const targetTeam = thrower.team === 1 ? this.team2 : this.team1;
+        const targets = targetTeam;
         
         targets.forEach(target => {
             if (target.health <= 0) return;
@@ -2396,23 +2365,8 @@ class MundoKnifeGame3D {
             
             const threshold = this.characterSize * 1.05;
             
-            if (isOpponentKnife && target === this.playerSelf) {
-                console.log('[KNIFE][PREDICT-DEBUG]', {
-                    role: this.isHostPlayer ? 'HOST' : 'JOINER',
-                    myTeam: this.myTeam,
-                    opponentTeam: this.opponentTeam,
-                    throwerTeam: thrower.team,
-                    targetTeam: target.team,
-                    distance: distance.toFixed(2),
-                    threshold: threshold.toFixed(2),
-                    willHit: distance < threshold,
-                    knifePos: { x: knifeWorldPos.x.toFixed(2), z: knifeWorldPos.z.toFixed(2) },
-                    targetPos: { x: targetWorldPos.x.toFixed(2), z: targetWorldPos.z.toFixed(2) }
-                });
-            }
-            
             if (distance < threshold) {
-                console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit ${isOpponentKnife ? 'self' : 'opponent'}! (multiplayer: ${this.isMultiplayer})`);
+                console.log(`💥 [HIT-LOCAL] Knife from Team${thrower.team} hit opponent! (AI mode)`);
                 
                 this.createBloodEffect(targetWorldPos.x, targetWorldPos.y, targetWorldPos.z);
                 
@@ -2424,27 +2378,17 @@ class MundoKnifeGame3D {
                 
                 knife.hasHit = true;
                 
-                if (this.isMultiplayer) {
-                    knife.mesh.visible = false;
-                    knife.predictedHit = true;
-                    
-                    if (isLocalPlayerKnife && target === this.playerOpponent && target.health > 0) {
-                        target.health = Math.max(0, target.health - 1);
-                        this.updateHealthDisplay();
-                    }
-                } else {
-                    this.disposeKnife(knife);
-                    this.knives.splice(knifeIndex, 1);
-                    
-                    target.health--;
-                    console.log(`💔 [HEALTH] Team${target.team} Player${target.playerIndex} health after hit: ${target.health}/${target.maxHealth}`);
-                    
-                    this.updateHealthDisplay();
-                    
-                    if (target.health <= 0) {
-                        console.log(`☠️ [DEATH] Team${target.team} Player${target.playerIndex} has died`);
-                        this.handlePlayerDeath(target);
-                    }
+                this.disposeKnife(knife);
+                this.knives.splice(knifeIndex, 1);
+                
+                target.health--;
+                console.log(`💔 [HEALTH] Team${target.team} Player${target.playerIndex} health after hit: ${target.health}/${target.maxHealth}`);
+                
+                this.updateHealthDisplay();
+                
+                if (target.health <= 0) {
+                    console.log(`☠️ [DEATH] Team${target.team} Player${target.playerIndex} has died`);
+                    this.handlePlayerDeath(target);
                 }
             }
         });
