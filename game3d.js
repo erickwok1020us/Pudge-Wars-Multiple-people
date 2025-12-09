@@ -2817,97 +2817,99 @@ class MundoKnifeGame3D {
     }
 
     applyRemoteHealthUpdate(data, eventName) {
-        console.log(`[HEALTH-RECV] Received ${eventName} - myTeam:${this.myTeam} opponentTeam:${this.opponentTeam} targetTeam:${data.targetTeam} health:${data.health}`);
+        console.log(`[HEALTH-RECV] Received ${eventName} - forwarding to applyServerHealthUpdate`);
         
-        if (this.lastHealthByTeam[data.targetTeam] === data.health) {
-            console.log('[HEALTH-RECV] Duplicate health update detected, skipping');
-            return;
-        }
+        // Map legacy event data to unified format and delegate to applyServerHealthUpdate
+        // This ensures all health updates go through the same validation and update logic
+        const targetTeam = Number(data.targetTeam);
         
-        const clampedHealth = Math.max(0, Math.min(data.health, 5));
-        if (clampedHealth !== data.health) {
-            console.log(`[HEALTH-RECV] Clamped health from ${data.health} to ${clampedHealth}`);
-        }
-        
-        this.lastHealthByTeam[data.targetTeam] = clampedHealth;
-        
-        if (data.targetTeam === this.myTeam) {
-            console.log(`[HEALTH-RECV] Updating playerSelf health: ${this.playerSelf.health} → ${clampedHealth}`);
-            this.playerSelf.health = clampedHealth;
-            this.updateHealthDisplay();
-            
-            if (this.playerSelf.health <= 0) {
-                console.log('☠️ [DEATH] PlayerSelf has died');
-                this.handlePlayerDeath(this.playerSelf);
+        // Try to get playerId from the appropriate player based on team
+        let targetPlayerId = data.targetPlayerId || null;
+        if (!targetPlayerId) {
+            if (targetTeam === this.myTeam && this.playerSelf) {
+                targetPlayerId = this.playerSelf.playerId;
+            } else if (targetTeam === this.opponentTeam && this.playerOpponent) {
+                targetPlayerId = this.playerOpponent.playerId;
             }
-        } else if (data.targetTeam === this.opponentTeam) {
-            console.log(`[HEALTH-RECV] Updating playerOpponent health: ${this.playerOpponent.health} → ${clampedHealth}`);
-            this.playerOpponent.health = clampedHealth;
-            this.updateHealthDisplay();
-            
-            if (this.playerOpponent.health <= 0) {
-                console.log('☠️ [DEATH] PlayerOpponent has died');
-                this.handlePlayerDeath(this.playerOpponent);
-            }
-        } else {
-            console.log('[HEALTH-RECV] WARNING: Received health update for unknown team', data.targetTeam);
         }
+        
+        // Delegate to unified health update function
+        this.applyServerHealthUpdate({
+            targetPlayerId: targetPlayerId,
+            targetTeam: targetTeam,
+            health: data.health,
+            isDead: data.health <= 0
+        });
     }
 
     applyServerHealthUpdate(data) {
         console.log(`[SERVER-HEALTH] Applying authoritative update - targetPlayerId:${data.targetPlayerId} targetTeam:${data.targetTeam} health:${data.health} isDead:${data.isDead}`);
         
-        // DEBUG: Log detailed type information to diagnose health desync
-        console.log('[SERVER-HEALTH][DEBUG]', {
-            targetPlayerId: data.targetPlayerId,
-            targetTeam: data.targetTeam,
-            targetTeamType: typeof data.targetTeam,
-            myTeam: this.myTeam,
-            myTeamType: typeof this.myTeam,
-            opponentTeam: this.opponentTeam,
-            opponentTeamType: typeof this.opponentTeam,
-            isHost: this.isHost,
-            playersByIdKeys: Array.from(this.playersById.keys()),
-            playerSelfHealth: this.playerSelf ? this.playerSelf.health : 'N/A',
-            playerOpponentHealth: this.playerOpponent ? this.playerOpponent.health : 'N/A'
-        });
-        
-        const clampedHealth = Math.max(0, Math.min(data.health, 5));
-        this.lastHealthByTeam[data.targetTeam] = clampedHealth;
-        
-        if (data.targetPlayerId && this.playersById.has(data.targetPlayerId)) {
-            const targetPlayer = this.playersById.get(data.targetPlayerId);
-            console.log(`[SERVER-HEALTH] Updating player ${data.targetPlayerId} health: ${targetPlayer.health} → ${clampedHealth}`);
-            targetPlayer.health = clampedHealth;
-            this.updateHealthDisplay();
-            
-            if (data.isDead && targetPlayer.health <= 0) {
-                console.log(`☠️ [SERVER-DEATH] Player ${data.targetPlayerId} has died (server confirmed)`);
-                this.handlePlayerDeath(targetPlayer);
-            }
+        // Validate required fields
+        if (data.health === undefined || data.health === null) {
+            console.warn('[SERVER-HEALTH] WARNING: Missing health value in update', data);
             return;
         }
         
-        if (data.targetTeam === this.myTeam) {
-            console.log(`[SERVER-HEALTH] Updating playerSelf health: ${this.playerSelf.health} → ${clampedHealth}`);
-            this.playerSelf.health = clampedHealth;
+        // Validate targetTeam is known (for 1v1 mode)
+        const targetTeam = Number(data.targetTeam);
+        if (targetTeam !== this.myTeam && targetTeam !== this.opponentTeam) {
+            console.warn('[SERVER-HEALTH] WARNING: Unknown targetTeam', targetTeam, 'myTeam:', this.myTeam, 'opponentTeam:', this.opponentTeam);
+            // Don't return - try to use playerId fallback
+        }
+        
+        // Get maxHealth from target player for proper clamping
+        let maxHealth = 5;
+        let targetPlayer = null;
+        
+        // Try to find target player by playerId first (most reliable)
+        if (data.targetPlayerId && this.playersById.has(data.targetPlayerId)) {
+            targetPlayer = this.playersById.get(data.targetPlayerId);
+            maxHealth = targetPlayer.maxHealth || 5;
+        } else if (targetTeam === this.myTeam && this.playerSelf) {
+            targetPlayer = this.playerSelf;
+            maxHealth = this.playerSelf.maxHealth || 5;
+        } else if (targetTeam === this.opponentTeam && this.playerOpponent) {
+            targetPlayer = this.playerOpponent;
+            maxHealth = this.playerOpponent.maxHealth || 5;
+        }
+        
+        // Clamp health to valid range
+        const clampedHealth = Math.max(0, Math.min(data.health, maxHealth));
+        if (clampedHealth !== data.health) {
+            console.log(`[SERVER-HEALTH] Clamped health from ${data.health} to ${clampedHealth} (max: ${maxHealth})`);
+        }
+        
+        // Deduplicate identical updates to prevent unnecessary UI refreshes
+        if (this.lastHealthByTeam[targetTeam] === clampedHealth && targetPlayer && targetPlayer.health === clampedHealth) {
+            console.log('[SERVER-HEALTH] Duplicate health update detected, skipping');
+            return;
+        }
+        
+        // Store last health for deduplication
+        this.lastHealthByTeam[targetTeam] = clampedHealth;
+        
+        // Apply health update to target player
+        if (targetPlayer) {
+            const previousHealth = targetPlayer.health;
+            targetPlayer.health = clampedHealth;
+            
+            console.log(`[SERVER-HEALTH] Updated ${data.targetPlayerId || 'team' + targetTeam} health: ${previousHealth} → ${clampedHealth}`);
+            
+            // Update UI
             this.updateHealthDisplay();
             
-            if (data.isDead && this.playerSelf.health <= 0) {
-                console.log('☠️ [SERVER-DEATH] PlayerSelf has died (server confirmed)');
-                this.handlePlayerDeath(this.playerSelf);
-            }
-        } else if (data.targetTeam === this.opponentTeam) {
-            console.log(`[SERVER-HEALTH] Updating playerOpponent health: ${this.playerOpponent.health} → ${clampedHealth}`);
-            this.playerOpponent.health = clampedHealth;
-            this.updateHealthDisplay();
-            
-            if (data.isDead && this.playerOpponent.health <= 0) {
-                console.log('☠️ [SERVER-DEATH] PlayerOpponent has died (server confirmed)');
-                this.handlePlayerDeath(this.playerOpponent);
+            // Handle death if server confirms player is dead
+            if ((data.isDead || clampedHealth <= 0) && targetPlayer.health <= 0) {
+                console.log(`☠️ [SERVER-DEATH] Player ${data.targetPlayerId || 'team' + targetTeam} has died (server confirmed)`);
+                this.handlePlayerDeath(targetPlayer);
             }
         } else {
-            console.log('[SERVER-HEALTH] WARNING: Received health update for unknown team', data.targetTeam);
+            console.warn('[SERVER-HEALTH] WARNING: Could not find target player for health update', {
+                targetPlayerId: data.targetPlayerId,
+                targetTeam: targetTeam,
+                playersById: Array.from(this.playersById.keys())
+            });
         }
     }
 
@@ -3178,13 +3180,10 @@ class MundoKnifeGame3D {
                         }
                     }
                     
-                    // Legacy 1v1 mode handling
-                    if (serverPlayer.playerId) {
-                        const localPlayer = this.playersById.get(serverPlayer.playerId);
-                        if (localPlayer && serverPlayer.health !== undefined) {
-                            localPlayer.health = serverPlayer.health;
-                        }
-                    }
+                    // NOTE: Legacy 1v1 mode handling block REMOVED
+                    // Health updates are now handled exclusively through serverHealthUpdate event
+                    // which calls applyServerHealthUpdate() for authoritative server-driven health sync
+                    // This prevents duplicate/conflicting health updates from serverGameState
                     
                     // Only correct position for the local player (not teammates in 3v3)
                     // Use playerId check to ensure we only correct our own character
