@@ -228,16 +228,22 @@ class MundoKnifeGame3D {
         
         console.log(`[NETCODE] Mode: ${practiceMode}, is3v3Mode: ${this.is3v3Mode}, interpolationDelay: ${this.interpolationDelay}ms`);
         
-        this.networkStats = {
-            lastUpdateTimes: [],
-            jitter: 0,
-            avgInterArrival: 0,
-            lastAdaptiveUpdate: Date.now(),
-            interArrivalTimes: [],
-            p50: 0,
-            p95: 0,
-            p99: 0
-        };
+                this.networkStats = {
+                    lastUpdateTimes: [],
+                    jitter: 0,
+                    avgInterArrival: 0,
+                    lastAdaptiveUpdate: Date.now(),
+                    interArrivalTimes: [],
+                    p50: 0,
+                    p95: 0,
+                    p99: 0
+                };
+        
+                // Delta compression state cache (for 3v3 mode bandwidth optimization)
+                this._stateCache = {
+                    players: new Map(),
+                    knives: new Map()
+                };
         
         this.debugSync = false;
         this.serverTimeOffset = 0;
@@ -3077,18 +3083,27 @@ class MundoKnifeGame3D {
             }
         });
         
-        socket.on('serverGameState', (data) => {
-            const now = Date.now();
+                socket.on('serverGameState', (data) => {
+                    const now = Date.now();
             
-            // Update time sync for ALL modes (moved from 1v1-only branch)
-            if (data.serverTime) {
-                const rawOffset = now - data.serverTime;
-                this.serverTimeOffset = this.serverTimeOffset * 0.9 + rawOffset * 0.1;
+                    // Handle delta compression (3v3 mode optimization)
+                    // If this is a delta update, apply it to our cached state
+                    if (data.delta && !data.full) {
+                        data = this._applyDeltaState(data);
+                    } else if (data.full) {
+                        // Full snapshot - update our cache
+                        this._updateStateCache(data);
+                    }
+            
+                    // Update time sync for ALL modes (moved from 1v1-only branch)
+                    if (data.serverTime) {
+                        const rawOffset = now - data.serverTime;
+                        this.serverTimeOffset = this.serverTimeOffset * 0.9 + rawOffset * 0.1;
                 
-                if (this.debugSync) {
-                    console.log(`[SYNC-DEBUG] serverTime: ${data.serverTime}, clientTime: ${now}, offset: ${this.serverTimeOffset.toFixed(2)}ms`);
-                }
-            }
+                        if (this.debugSync) {
+                            console.log(`[SYNC-DEBUG] serverTime: ${data.serverTime}, clientTime: ${now}, offset: ${this.serverTimeOffset.toFixed(2)}ms`);
+                        }
+                    }
             
             // Update network stats for adaptive interpolation delay (for ALL modes)
             this.networkStats.lastUpdateTimes.push(now);
@@ -3525,11 +3540,94 @@ class MundoKnifeGame3D {
         console.log('[BRIGHTNESS] Set to:', this.brightnessLevel);
     }
 
-    getBrightness() {
-        return this.brightnessLevel || 1.0;
-    }
+        getBrightness() {
+            return this.brightnessLevel || 1.0;
+        }
+    
+        /**
+         * Apply delta state update to reconstruct full state
+         * Used for 3v3 mode bandwidth optimization
+         * @param {Object} deltaData - Delta state from server
+         * @returns {Object} Full state data
+         */
+        _applyDeltaState(deltaData) {
+            const fullState = {
+                serverTick: deltaData.serverTick,
+                serverTime: deltaData.serverTime,
+                players: [],
+                knives: []
+            };
+        
+            // Apply player deltas
+            if (deltaData.players) {
+                for (const playerDelta of deltaData.players) {
+                    const cached = this._stateCache.players.get(playerDelta.playerId);
+                    const fullPlayer = cached ? { ...cached, ...playerDelta } : playerDelta;
+                    fullState.players.push(fullPlayer);
+                    this._stateCache.players.set(playerDelta.playerId, fullPlayer);
+                }
+            }
+        
+            // Include unchanged players from cache
+            for (const [playerId, cachedPlayer] of this._stateCache.players) {
+                if (!deltaData.players || !deltaData.players.find(p => p.playerId === playerId)) {
+                    fullState.players.push(cachedPlayer);
+                }
+            }
+        
+            // Apply knife deltas
+            if (deltaData.knives) {
+                for (const knifeDelta of deltaData.knives) {
+                    const cached = this._stateCache.knives.get(knifeDelta.knifeId);
+                    const fullKnife = cached ? { ...cached, ...knifeDelta } : knifeDelta;
+                    fullState.knives.push(fullKnife);
+                    this._stateCache.knives.set(knifeDelta.knifeId, fullKnife);
+                }
+            }
+        
+            // Include unchanged knives from cache
+            for (const [knifeId, cachedKnife] of this._stateCache.knives) {
+                if (!deltaData.knives || !deltaData.knives.find(k => k.knifeId === knifeId)) {
+                    fullState.knives.push(cachedKnife);
+                }
+            }
+        
+            // Handle removed knives
+            if (deltaData.removedKnives) {
+                for (const knifeId of deltaData.removedKnives) {
+                    this._stateCache.knives.delete(knifeId);
+                    // Remove from fullState.knives
+                    const idx = fullState.knives.findIndex(k => k.knifeId === knifeId);
+                    if (idx > -1) {
+                        fullState.knives.splice(idx, 1);
+                    }
+                }
+            }
+        
+            return fullState;
+        }
+    
+        /**
+         * Update state cache with full snapshot
+         * @param {Object} data - Full state data from server
+         */
+        _updateStateCache(data) {
+            if (data.players) {
+                this._stateCache.players.clear();
+                for (const player of data.players) {
+                    this._stateCache.players.set(player.playerId, { ...player });
+                }
+            }
+        
+            if (data.knives) {
+                this._stateCache.knives.clear();
+                for (const knife of data.knives) {
+                    this._stateCache.knives.set(knife.knifeId, { ...knife });
+                }
+            }
+        }
 
-    dispose() {
+        dispose() {
         console.log('[DISPOSE] Cleaning up game instance');
         this.gameState.isRunning = false;
         this.stopLatencyMeasurement();
